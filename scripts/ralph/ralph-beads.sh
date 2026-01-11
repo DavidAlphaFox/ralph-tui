@@ -131,17 +131,20 @@ get_next_bead_in_epic() {
         # bv --robot-triage returns multiple recommendations
         # Filter to children of this epic (IDs starting with EPIC_ID.)
         # Use triage instead of next because next might return the epic itself
+        # Use jq 'first()' to get only the first matching result
         bv --robot-triage 2>/dev/null | jq --arg EPIC "$EPIC_ID" '
-            .triage.recommendations[] |
-            select(.id | startswith($EPIC + ".")) |
-            {
-                id: .id,
-                title: .title,
-                score: .score,
-                reasons: (.reasons // []),
-                epic: $EPIC
-            }
-        ' | head -1
+            first(
+                .triage.recommendations[] |
+                select(.id | startswith($EPIC + ".")) |
+                {
+                    id: .id,
+                    title: .title,
+                    score: .score,
+                    reasons: (.reasons // []),
+                    epic: $EPIC
+                }
+            )
+        '
     else
         # Fallback: parse bd list output (no JSON support)
         # Get first open child bead by priority
