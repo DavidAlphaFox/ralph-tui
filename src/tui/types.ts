@@ -64,23 +64,22 @@ export interface TaskItem {
 }
 
 /**
- * Props for the Header component
+ * Props for the Header component.
+ * Compact header shows only essential info: status, current task, progress, elapsed time.
  */
 export interface HeaderProps {
   /** Current Ralph execution status */
   status: RalphStatus;
-  /** Name of the current epic/project */
-  epicName: string;
   /** Elapsed time in seconds */
   elapsedTime: number;
-  /** Name of the tracker being used (e.g., 'beads', 'jira') */
-  trackerName: string;
   /** Current task ID being worked on (if any) */
   currentTaskId?: string;
   /** Current task title being worked on (if any) */
   currentTaskTitle?: string;
-  /** Current iteration number (if running) */
-  currentIteration?: number;
+  /** Number of completed tasks (for progress display) */
+  completedTasks?: number;
+  /** Total number of tasks (for progress display) */
+  totalTasks?: number;
 }
 
 /**

@@ -28,6 +28,7 @@ import type { TrackerTask } from '../../plugins/trackers/types.js';
 import type { StoredConfig } from '../../config/types.js';
 import type { AgentPluginMeta } from '../../plugins/agents/types.js';
 import type { TrackerPluginMeta } from '../../plugins/trackers/types.js';
+import { getIterationLogsByTask } from '../../logs/index.js';
 
 /**
  * View modes for the RunApp component
@@ -44,6 +45,8 @@ type ViewMode = 'tasks' | 'iterations' | 'task-detail' | 'iteration-detail';
 export interface RunAppProps {
   /** The execution engine instance */
   engine: ExecutionEngine;
+  /** Current working directory for loading historical logs */
+  cwd: string;
   /** Callback when quit is requested */
   onQuit?: () => Promise<void>;
   /** Callback when Enter is pressed on a task to drill into details */
@@ -196,6 +199,7 @@ function convertTasksWithDependencyStatus(trackerTasks: TrackerTask[]): TaskItem
  */
 export function RunApp({
   engine,
+  cwd,
   onQuit,
   onTaskDrillDown,
   onIterationDrillDown,
@@ -231,8 +235,8 @@ export function RunApp({
   const [epicName] = useState('Ralph');
   const [trackerName] = useState('beads');
   const [agentName] = useState('claude');
-  // Dashboard visibility state
-  const [showDashboard, setShowDashboard] = useState(true);
+  // Dashboard visibility state (off by default for compact header design)
+  const [showDashboard, setShowDashboard] = useState(false);
   // Completed iterations count for ETA calculation
   const [completedIterations, setCompletedIterations] = useState(0);
   // Iteration history state
@@ -250,6 +254,10 @@ export function RunApp({
   const [showSettings, setShowSettings] = useState(false);
   // Show/hide closed tasks filter (default: show closed tasks)
   const [showClosedTasks, setShowClosedTasks] = useState(true);
+  // Cache for historical iteration output loaded from disk (taskId -> stdout)
+  const [historicalOutputCache, setHistoricalOutputCache] = useState<Map<string, string>>(
+    () => new Map()
+  );
   // Current task info for status display
   const [currentTaskId, setCurrentTaskId] = useState<string | undefined>(undefined);
   const [currentTaskTitle, setCurrentTaskTitle] = useState<string | undefined>(undefined);
@@ -682,7 +690,7 @@ export function RunApp({
       return { iteration: currentIteration, output: currentOutput };
     }
 
-    // Look for a completed iteration for this task
+    // Look for a completed iteration for this task (in-memory from current session)
     const taskIteration = iterations.find((iter) => iter.task.id === selectedTask.id);
     if (taskIteration) {
       return {
@@ -691,9 +699,51 @@ export function RunApp({
       };
     }
 
-    // Task hasn't been run yet
+    // Check historical output cache (loaded from disk)
+    const historicalOutput = historicalOutputCache.get(selectedTask.id);
+    if (historicalOutput !== undefined) {
+      return {
+        iteration: -1, // Historical iteration number unknown, use -1 to indicate "past"
+        output: historicalOutput,
+      };
+    }
+
+    // Task hasn't been run yet (or historical log not yet loaded)
     return { iteration: 0, output: undefined };
-  }, [selectedTask, currentTaskId, currentIteration, currentOutput, iterations]);
+  }, [selectedTask, currentTaskId, currentIteration, currentOutput, iterations, historicalOutputCache]);
+
+  // Load historical iteration logs from disk when a completed task is selected
+  useEffect(() => {
+    if (!selectedTask) return;
+    if (!cwd) return;
+
+    // Only load if task is done/closed and not already in cache or in-memory iterations
+    const isCompleted = selectedTask.status === 'done' || selectedTask.status === 'closed';
+    const hasInMemory = iterations.some((iter) => iter.task.id === selectedTask.id);
+    const hasInCache = historicalOutputCache.has(selectedTask.id);
+
+    if (isCompleted && !hasInMemory && !hasInCache) {
+      // Load from disk asynchronously
+      getIterationLogsByTask(cwd, selectedTask.id).then((logs) => {
+        if (logs.length > 0) {
+          // Use the most recent log (last one)
+          const mostRecent = logs[logs.length - 1];
+          setHistoricalOutputCache((prev) => {
+            const next = new Map(prev);
+            next.set(selectedTask.id, mostRecent.stdout);
+            return next;
+          });
+        } else {
+          // No logs found - mark as empty string to avoid repeated lookups
+          setHistoricalOutputCache((prev) => {
+            const next = new Map(prev);
+            next.set(selectedTask.id, '');
+            return next;
+          });
+        }
+      });
+    }
+  }, [selectedTask, cwd, iterations, historicalOutputCache]);
 
   return (
     <box
@@ -704,15 +754,14 @@ export function RunApp({
         backgroundColor: colors.bg.primary,
       }}
     >
-      {/* Header */}
+      {/* Header - compact design showing only essential info */}
       <Header
         status={status}
-        epicName={epicName}
         elapsedTime={elapsedTime}
-        trackerName={trackerName || 'beads'}
         currentTaskId={currentTaskId}
         currentTaskTitle={currentTaskTitle}
-        currentIteration={currentIteration}
+        completedTasks={completedTasks}
+        totalTasks={totalTasks}
       />
 
       {/* Progress Dashboard - toggleable with 'd' key */}

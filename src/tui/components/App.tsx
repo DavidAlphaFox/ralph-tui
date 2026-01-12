@@ -38,20 +38,20 @@ export interface AppProps {
  * Real tasks come from the tracker when using 'ralph-tui run'.
  */
 function createDefaultState(tasks: TaskItem[] = []): AppState {
-  const completedTasks = tasks.filter((t) => t.status === 'done').length;
-  const progress = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+  const completedTasksCount = tasks.filter((t) => t.status === 'done').length;
+  const progress = tasks.length > 0 ? Math.round((completedTasksCount / tasks.length) * 100) : 0;
 
   return {
     header: {
       status: 'ready',
-      epicName: 'No Epic Selected',
       elapsedTime: 0,
-      trackerName: '-',
+      completedTasks: completedTasksCount,
+      totalTasks: tasks.length,
     },
     footer: {
       progress,
       totalTasks: tasks.length,
-      completedTasks,
+      completedTasks: completedTasksCount,
     },
     leftPanel: {
       tasks,
@@ -186,12 +186,12 @@ export function App({ initialState, onQuit, onTaskDrillDown }: AppProps): ReactN
         backgroundColor: colors.bg.primary,
       }}
     >
-      {/* Header */}
+      {/* Header - compact design */}
       <Header
         status={state.header.status}
-        epicName={state.header.epicName}
         elapsedTime={elapsedTime}
-        trackerName={state.header.trackerName}
+        completedTasks={state.footer.completedTasks}
+        totalTasks={state.footer.totalTasks}
       />
 
       {/* Main content area */}

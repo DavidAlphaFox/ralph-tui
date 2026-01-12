@@ -121,7 +121,8 @@ export const fullKeyboardShortcuts = [
  */
 export const layout = {
   header: {
-    height: 3,
+    // Compact single-line header (no border)
+    height: 1,
   },
   footer: {
     height: 3,
