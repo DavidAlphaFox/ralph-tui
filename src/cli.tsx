@@ -51,7 +51,7 @@ Commands:
 
 Run Options:
   --epic <id>         Epic ID for beads tracker
-  --prd <path>        PRD file path for json tracker
+  --prd <path>        PRD file path (auto-switches to json tracker)
   --agent <name>      Override agent plugin (e.g., claude, opencode)
   --model <name>      Override model (e.g., opus, sonnet)
   --tracker <name>    Override tracker plugin (e.g., beads, beads-bv, json)

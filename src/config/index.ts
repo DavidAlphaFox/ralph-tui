@@ -5,7 +5,7 @@
  */
 
 import { homedir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { readFile, access, constants, mkdir } from 'node:fs/promises';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import type {
@@ -434,10 +434,23 @@ export async function buildConfig(
   }
 
   // Get tracker config
-  const trackerConfig = getDefaultTrackerConfig(storedConfig, options);
+  let trackerConfig = getDefaultTrackerConfig(storedConfig, options);
   if (!trackerConfig) {
     console.error('Error: No tracker configured or available');
     return null;
+  }
+
+  // Auto-switch to JSON tracker when --prd specified without explicit --tracker
+  // This allows `ralph-tui run --prd ./prd.json` to work without needing `--tracker json`
+  if (options.prdPath && !options.tracker) {
+    const registry = getTrackerRegistry();
+    if (registry.hasPlugin('json')) {
+      trackerConfig = {
+        name: 'json',
+        plugin: 'json',
+        options: {},
+      };
+    }
   }
 
   // Apply epic/prd options to tracker
@@ -448,9 +461,12 @@ export async function buildConfig(
     };
   }
   if (options.prdPath) {
+    // Map prdPath to 'path' for JSON tracker compatibility
+    // JSON tracker expects config.path, but CLI uses --prd for better UX
     trackerConfig.options = {
       ...trackerConfig.options,
       prdPath: options.prdPath,
+      path: options.prdPath,
     };
   }
 
@@ -521,6 +537,21 @@ export async function validateConfig(
   if (config.tracker.plugin === 'json') {
     if (!config.prdPath) {
       errors.push('PRD path required for json tracker');
+    } else {
+      // Validate PRD file exists and is valid JSON
+      const prdFilePath = resolve(config.cwd, config.prdPath);
+      try {
+        await access(prdFilePath, constants.R_OK);
+        // Try to parse as JSON to validate format
+        const content = await readFile(prdFilePath, 'utf-8');
+        JSON.parse(content);
+      } catch (err) {
+        if (err instanceof SyntaxError) {
+          errors.push(`PRD file is not valid JSON: ${config.prdPath}`);
+        } else {
+          errors.push(`PRD file not found or not readable: ${config.prdPath}`);
+        }
+      }
     }
   }
 
