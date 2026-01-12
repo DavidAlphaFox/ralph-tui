@@ -91,11 +91,6 @@ function getTrackerOptions(cwd: string): TrackerOption[] {
  * PRD Preview component for the right panel
  */
 function PrdPreview({ content, path }: { content: string; path: string }): ReactNode {
-  // Truncate content for preview (show first ~50 lines)
-  const lines = content.split('\n');
-  const previewLines = lines.slice(0, 50);
-  const truncated = lines.length > 50;
-
   return (
     <box
       style={{
@@ -123,12 +118,9 @@ function PrdPreview({ content, path }: { content: string; path: string }): React
         <text fg={colors.fg.muted}>{path.split('/').pop()}</text>
       </box>
 
-      {/* Content */}
+      {/* Content - scrollable, shows full PRD */}
       <scrollbox style={{ flexGrow: 1, padding: 1 }} stickyScroll={false}>
-        <text fg={colors.fg.primary}>
-          {previewLines.join('\n')}
-          {truncated && '\n\n... (truncated)'}
-        </text>
+        <text fg={colors.fg.primary}>{content}</text>
       </scrollbox>
     </box>
   );
