@@ -41,6 +41,21 @@ export const RateLimitHandlingConfigSchema = z.object({
 });
 
 /**
+ * Notification sound mode schema
+ */
+export const NotificationSoundModeSchema = z.enum(['off', 'system', 'ralph']);
+
+/**
+ * Notifications configuration schema
+ */
+export const NotificationsConfigSchema = z.object({
+  /** Whether desktop notifications are enabled (default: true) */
+  enabled: z.boolean().optional(),
+  /** Sound mode for notifications (default: 'off') */
+  sound: NotificationSoundModeSchema.optional(),
+});
+
+/**
  * Agent plugin configuration schema
  */
 export const AgentPluginConfigSchema = z.object({
@@ -113,6 +128,9 @@ export const StoredConfigSchema = z
 
     // Subagent tracing detail level
     subagentTracingDetail: SubagentDetailLevelSchema.optional(),
+
+    // Notifications configuration
+    notifications: NotificationsConfigSchema.optional(),
   })
   .strict();
 

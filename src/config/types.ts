@@ -45,6 +45,24 @@ export const DEFAULT_RATE_LIMIT_HANDLING: Required<RateLimitHandlingConfig> = {
 export type SubagentDetailLevel = 'off' | 'minimal' | 'moderate' | 'full';
 
 /**
+ * Sound mode for notifications.
+ * - 'off': No sound (default)
+ * - 'system': Use OS default notification sound
+ * - 'ralph': Play random Ralph Wiggum sound clips
+ */
+export type NotificationSoundMode = 'off' | 'system' | 'ralph';
+
+/**
+ * Notifications configuration for desktop notifications.
+ */
+export interface NotificationsConfig {
+  /** Whether desktop notifications are enabled (default: true) */
+  enabled?: boolean;
+  /** Sound mode for notifications (default: 'off') */
+  sound?: NotificationSoundMode;
+}
+
+/**
  * Runtime options that can be passed via CLI flags
  */
 export interface RuntimeOptions {
@@ -95,6 +113,9 @@ export interface RuntimeOptions {
 
   /** Progress file path for cross-iteration context */
   progressFile?: string;
+
+  /** Override notifications enabled state (--notify or --no-notify CLI flags) */
+  notify?: boolean;
 }
 
 /**
@@ -157,6 +178,9 @@ export interface StoredConfig {
 
   /** Subagent tracing detail level for controlling display verbosity */
   subagentTracingDetail?: SubagentDetailLevel;
+
+  /** Notifications configuration */
+  notifications?: NotificationsConfig;
 }
 
 /**

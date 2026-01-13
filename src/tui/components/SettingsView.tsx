@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
 import { useState, useCallback, useEffect } from 'react';
 import { useKeyboard } from '@opentui/react';
 import { colors } from '../theme.js';
-import type { StoredConfig, SubagentDetailLevel } from '../../config/types.js';
+import type { StoredConfig, SubagentDetailLevel, NotificationSoundMode } from '../../config/types.js';
 import type { AgentPluginMeta } from '../../plugins/agents/types.js';
 import type { TrackerPluginMeta } from '../../plugins/trackers/types.js';
 
@@ -137,6 +137,37 @@ function buildSettingDefinitions(
       setValue: (config, value) => ({
         ...config,
         subagentTracingDetail: value as SubagentDetailLevel,
+      }),
+      requiresRestart: false,
+    },
+    {
+      key: 'notifications',
+      label: 'Notifications',
+      type: 'boolean',
+      description: 'Enable desktop notifications for task completion',
+      getValue: (config) => config.notifications?.enabled ?? true,
+      setValue: (config, value) => ({
+        ...config,
+        notifications: {
+          ...config.notifications,
+          enabled: value as boolean,
+        },
+      }),
+      requiresRestart: false,
+    },
+    {
+      key: 'notificationSound',
+      label: 'Notif Sound',
+      type: 'select',
+      description: 'Sound mode: off, system (OS default), or ralph (Wiggum quotes)',
+      options: ['off', 'system', 'ralph'],
+      getValue: (config) => config.notifications?.sound ?? 'off',
+      setValue: (config, value) => ({
+        ...config,
+        notifications: {
+          ...config.notifications,
+          sound: value as NotificationSoundMode,
+        },
       }),
       requiresRestart: false,
     },
