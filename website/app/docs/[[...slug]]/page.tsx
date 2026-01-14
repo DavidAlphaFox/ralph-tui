@@ -35,17 +35,24 @@ export async function generateStaticParams() {
  */
 export async function generateMetadata({ params }: DocPageProps) {
   const resolvedParams = await params;
-  const slugPath = resolvedParams.slug?.join('/') || 'getting-started/introduction';
+  // If no slug, we'll redirect in the page component
+  if (!resolvedParams.slug || resolvedParams.slug.length === 0) {
+    return {
+      title: 'Documentation - Ralph TUI',
+      description: 'Ralph TUI documentation',
+    };
+  }
+  const slugPath = resolvedParams.slug.join('/');
 
   try {
     const { frontmatter } = await getDocBySlug(slugPath);
     return {
-      title: `${frontmatter.title} | Ralph TUI Docs`,
+      title: frontmatter.title,
       description: frontmatter.description || `Documentation for ${frontmatter.title}`,
     };
   } catch {
     return {
-      title: 'Documentation | Ralph TUI',
+      title: 'Documentation',
       description: 'Ralph TUI documentation',
     };
   }
@@ -57,8 +64,15 @@ export async function generateMetadata({ params }: DocPageProps) {
  */
 export default async function DocPage({ params }: DocPageProps) {
   const resolvedParams = await params;
-  const slugPath = resolvedParams.slug?.join('/') || 'getting-started/introduction';
-  const currentPath = '/docs' + (slugPath ? '/' + slugPath : '');
+
+  // Redirect /docs to /docs/getting-started/introduction
+  if (!resolvedParams.slug || resolvedParams.slug.length === 0) {
+    const { redirect } = await import('next/navigation');
+    redirect('/docs/getting-started/introduction');
+  }
+
+  const slugPath = resolvedParams.slug.join('/');
+  const currentPath = '/docs/' + slugPath;
 
   let docData;
   try {

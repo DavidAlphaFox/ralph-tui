@@ -4,5 +4,7 @@
  */
 
 export { Hero } from './Hero';
+export { PlanningPhase } from './PlanningPhase';
 export { FeatureGrid } from './FeatureGrid';
 export { WorkflowVisualization } from './WorkflowVisualization';
+export { CTASection } from './CTASection';

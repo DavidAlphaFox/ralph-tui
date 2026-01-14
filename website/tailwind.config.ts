@@ -1,6 +1,6 @@
 /**
  * ABOUTME: Tailwind CSS configuration with design tokens from the Ralph TUI theme.
- * Provides consistent styling between the terminal TUI and the website.
+ * Uses CSS variables for dark/light mode theming support.
  */
 
 import type { Config } from 'tailwindcss';
@@ -15,38 +15,38 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Background colors (from TUI theme)
+        // Background colors using CSS variables for theme switching
         bg: {
-          primary: '#1a1b26',
-          secondary: '#24283b',
-          tertiary: '#2f3449',
-          highlight: '#3d4259',
+          primary: 'rgb(var(--bg-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--bg-secondary) / <alpha-value>)',
+          tertiary: 'rgb(var(--bg-tertiary) / <alpha-value>)',
+          highlight: 'rgb(var(--bg-highlight) / <alpha-value>)',
         },
         // Foreground (text) colors
         fg: {
-          primary: '#c0caf5',
-          secondary: '#a9b1d6',
-          muted: '#565f89',
-          dim: '#414868',
+          primary: 'rgb(var(--fg-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--fg-secondary) / <alpha-value>)',
+          muted: 'rgb(var(--fg-muted) / <alpha-value>)',
+          dim: 'rgb(var(--fg-dim) / <alpha-value>)',
         },
         // Status colors
         status: {
-          success: '#9ece6a',
-          warning: '#e0af68',
-          error: '#f7768e',
-          info: '#7aa2f7',
+          success: 'rgb(var(--status-success) / <alpha-value>)',
+          warning: 'rgb(var(--status-warning) / <alpha-value>)',
+          error: 'rgb(var(--status-error) / <alpha-value>)',
+          info: 'rgb(var(--status-info) / <alpha-value>)',
         },
         // Accent colors
         accent: {
-          primary: '#7aa2f7',
-          secondary: '#bb9af7',
-          tertiary: '#7dcfff',
+          primary: 'rgb(var(--accent-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--accent-secondary) / <alpha-value>)',
+          tertiary: 'rgb(var(--accent-tertiary) / <alpha-value>)',
         },
         // Border colors
         border: {
-          DEFAULT: '#3d4259',
-          active: '#7aa2f7',
-          muted: '#2f3449',
+          DEFAULT: 'rgb(var(--border) / <alpha-value>)',
+          active: 'rgb(var(--border-active) / <alpha-value>)',
+          muted: 'rgb(var(--border-muted) / <alpha-value>)',
         },
       },
       fontFamily: {
@@ -56,22 +56,22 @@ const config: Config = {
       typography: {
         DEFAULT: {
           css: {
-            '--tw-prose-body': '#c0caf5',
-            '--tw-prose-headings': '#c0caf5',
-            '--tw-prose-lead': '#a9b1d6',
-            '--tw-prose-links': '#7aa2f7',
-            '--tw-prose-bold': '#c0caf5',
-            '--tw-prose-counters': '#565f89',
-            '--tw-prose-bullets': '#565f89',
-            '--tw-prose-hr': '#3d4259',
-            '--tw-prose-quotes': '#a9b1d6',
-            '--tw-prose-quote-borders': '#7aa2f7',
-            '--tw-prose-captions': '#565f89',
-            '--tw-prose-code': '#7dcfff',
-            '--tw-prose-pre-code': '#c0caf5',
-            '--tw-prose-pre-bg': '#1a1b26',
-            '--tw-prose-th-borders': '#3d4259',
-            '--tw-prose-td-borders': '#2f3449',
+            '--tw-prose-body': 'rgb(var(--fg-primary))',
+            '--tw-prose-headings': 'rgb(var(--fg-primary))',
+            '--tw-prose-lead': 'rgb(var(--fg-secondary))',
+            '--tw-prose-links': 'rgb(var(--accent-primary))',
+            '--tw-prose-bold': 'rgb(var(--fg-primary))',
+            '--tw-prose-counters': 'rgb(var(--fg-muted))',
+            '--tw-prose-bullets': 'rgb(var(--fg-muted))',
+            '--tw-prose-hr': 'rgb(var(--border))',
+            '--tw-prose-quotes': 'rgb(var(--fg-secondary))',
+            '--tw-prose-quote-borders': 'rgb(var(--accent-primary))',
+            '--tw-prose-captions': 'rgb(var(--fg-muted))',
+            '--tw-prose-code': 'rgb(var(--accent-tertiary))',
+            '--tw-prose-pre-code': 'rgb(var(--fg-primary))',
+            '--tw-prose-pre-bg': 'rgb(var(--bg-primary))',
+            '--tw-prose-th-borders': 'rgb(var(--border))',
+            '--tw-prose-td-borders': 'rgb(var(--border-muted))',
           },
         },
       },

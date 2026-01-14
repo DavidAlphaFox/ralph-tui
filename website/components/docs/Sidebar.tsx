@@ -132,7 +132,7 @@ export function Sidebar({ className = '' }: SidebarProps) {
               'bg-status-success/10 text-status-success',
             ].join(' ')}
           >
-            v0.1.0
+            v0.1.3
           </span>
         </div>
 

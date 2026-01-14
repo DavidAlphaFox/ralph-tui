@@ -8,3 +8,4 @@ export { SidebarNavItem } from './SidebarNav';
 export { TableOfContents } from './TableOfContents';
 export { Breadcrumbs } from './Breadcrumbs';
 export { PrevNextNav } from './PrevNextNav';
+export { DocSearch, SearchButton } from './DocSearch';

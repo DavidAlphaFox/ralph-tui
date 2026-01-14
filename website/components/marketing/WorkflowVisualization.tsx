@@ -35,13 +35,22 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
     glowColor: 'rgba(122, 162, 247, 0.4)',
   },
   {
-    id: 'build',
+    id: 'prompt',
     number: '02',
-    title: 'BUILD',
-    description: 'Generate intelligent prompts from templates with full context injection',
+    title: 'PROMPT',
+    description: 'Generate smart prompts from templates with minimal relevant context injection',
     icon: Hammer,
     accentColor: 'text-accent-secondary',
     glowColor: 'rgba(187, 154, 247, 0.4)',
+  },
+  {
+    id: 'evaluate',
+    number: '04',
+    title: 'EVALUATE',
+    description: 'Analyze output to determine completion status and next actions',
+    icon: CheckCircle,
+    accentColor: 'text-status-success',
+    glowColor: 'rgba(158, 206, 106, 0.4)',
   },
   {
     id: 'execute',
@@ -51,15 +60,6 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
     icon: Zap,
     accentColor: 'text-status-warning',
     glowColor: 'rgba(224, 175, 104, 0.4)',
-  },
-  {
-    id: 'detect',
-    number: '04',
-    title: 'DETECT',
-    description: 'Analyze output to determine completion status and next actions',
-    icon: CheckCircle,
-    accentColor: 'text-status-success',
-    glowColor: 'rgba(158, 206, 106, 0.4)',
   },
 ];
 
@@ -130,7 +130,7 @@ function WorkflowStepCard({ step, index }: { step: WorkflowStep; index: number }
     >
       {/* Glow effect on hover */}
       <div
-        className="absolute -inset-1 rounded-lg opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-100"
+        className="absolute -inset-1 rounded-lg opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-50"
         style={{ backgroundColor: step.glowColor }}
         aria-hidden="true"
       />
@@ -174,77 +174,34 @@ function WorkflowStepCard({ step, index }: { step: WorkflowStep; index: number }
 }
 
 /**
- * Circular arrow SVG connecting the workflow steps (desktop only).
+ * Simple arrows connecting workflow steps in clockwise order (desktop only).
+ * SELECT → PROMPT → EXECUTE → EVALUATE → loop
  */
 function CircularFlowArrows() {
   return (
-    <motion.svg
+    <svg
       className="pointer-events-none absolute inset-0 h-full w-full"
-      viewBox="0 0 600 600"
+      viewBox="0 0 100 100"
       fill="none"
       aria-hidden="true"
-      initial="hidden"
-      animate="visible"
+      preserveAspectRatio="none"
     >
-      {/* Curved arrows between each step */}
-      {/* Top-right curve (SELECT -> BUILD) */}
-      <motion.path
-        d="M 350 120 Q 480 120 480 250"
-        stroke="url(#gradient1)"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeDasharray="6 4"
-        variants={arrowVariants}
-        style={{ filter: 'drop-shadow(0 0 4px rgba(122, 162, 247, 0.3))' }}
-      />
-      {/* Bottom-right curve (BUILD -> EXECUTE) */}
-      <motion.path
-        d="M 480 350 Q 480 480 350 480"
-        stroke="url(#gradient2)"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeDasharray="6 4"
-        variants={arrowVariants}
-      />
-      {/* Bottom-left curve (EXECUTE -> DETECT) */}
-      <motion.path
-        d="M 250 480 Q 120 480 120 350"
-        stroke="url(#gradient3)"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeDasharray="6 4"
-        variants={arrowVariants}
-      />
-      {/* Top-left curve (DETECT -> SELECT) */}
-      <motion.path
-        d="M 120 250 Q 120 120 250 120"
-        stroke="url(#gradient4)"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeDasharray="6 4"
-        variants={arrowVariants}
-      />
+      {/* Lines - centered in gaps between card pairs */}
+      {/* Arrow 1: SELECT → PROMPT (top horizontal gap, centered at x=50) */}
+      <line x1="46" y1="25" x2="51" y2="25" stroke="rgb(var(--fg-muted))" strokeWidth="0.8" opacity="0.5" />
+      {/* Arrow 2: PROMPT → EXECUTE (right vertical gap, centered at y=50) */}
+      <line x1="75" y1="46" x2="75" y2="51" stroke="rgb(var(--fg-muted))" strokeWidth="0.8" opacity="0.5" />
+      {/* Arrow 3: EXECUTE → EVALUATE (bottom horizontal gap, centered at x=50) */}
+      <line x1="54" y1="75" x2="49" y2="75" stroke="rgb(var(--fg-muted))" strokeWidth="0.8" opacity="0.5" />
+      {/* Arrow 4: EVALUATE → SELECT (left vertical gap, centered at y=50) */}
+      <line x1="25" y1="54" x2="25" y2="49" stroke="rgb(var(--fg-muted))" strokeWidth="0.8" opacity="0.5" />
 
-      {/* Gradient definitions */}
-      <defs>
-        <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#7aa2f7" stopOpacity="0.6" />
-          <stop offset="100%" stopColor="#bb9af7" stopOpacity="0.6" />
-        </linearGradient>
-        <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#bb9af7" stopOpacity="0.6" />
-          <stop offset="100%" stopColor="#e0af68" stopOpacity="0.6" />
-        </linearGradient>
-        <linearGradient id="gradient3" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#e0af68" stopOpacity="0.6" />
-          <stop offset="100%" stopColor="#9ece6a" stopOpacity="0.6" />
-        </linearGradient>
-        <linearGradient id="gradient4" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#9ece6a" stopOpacity="0.6" />
-          <stop offset="100%" stopColor="#7aa2f7" stopOpacity="0.6" />
-        </linearGradient>
-      </defs>
-    </motion.svg>
+      {/* Arrowheads - centered with lines */}
+      <path d="M 51 23.5 L 54 25 L 51 26.5 Z" fill="rgb(var(--fg-muted))" opacity="0.5" />
+      <path d="M 73.5 51 L 75 54 L 76.5 51 Z" fill="rgb(var(--fg-muted))" opacity="0.5" />
+      <path d="M 49 76.5 L 46 75 L 49 73.5 Z" fill="rgb(var(--fg-muted))" opacity="0.5" />
+      <path d="M 26.5 49 L 25 46 L 23.5 49 Z" fill="rgb(var(--fg-muted))" opacity="0.5" />
+    </svg>
   );
 }
 
@@ -279,12 +236,12 @@ function CentralLoopIndicator() {
       <div className="relative">
         {/* Outer glow ring */}
         <div
-          className="absolute -inset-4 animate-pulse rounded-full bg-accent-primary/10 blur-xl"
+          className="absolute -inset-5 animate-pulse rounded-full bg-accent-primary/10 blur-xl"
           aria-hidden="true"
         />
 
         {/* Inner content */}
-        <div className="relative flex h-24 w-24 flex-col items-center justify-center rounded-full border border-border-active/40 bg-bg-secondary/90 backdrop-blur-sm">
+        <div className="relative flex h-32 w-32 flex-col items-center justify-center rounded-full border border-border-active/40 bg-bg-secondary/90 backdrop-blur-sm">
           {/* Rotating ring effect */}
           <div
             className="absolute inset-0 rounded-full border-2 border-transparent"
@@ -297,7 +254,7 @@ function CentralLoopIndicator() {
 
           {/* Text */}
           <span className="font-mono text-[10px] uppercase tracking-widest text-fg-muted">
-            Infinite
+            Ralph
           </span>
           <span className="font-mono text-lg font-bold tracking-tight text-accent-primary">
             LOOP
@@ -378,14 +335,16 @@ export function WorkflowVisualization() {
           {/* Desktop: 2x2 grid with circular flow */}
           <div className="hidden md:block">
             <div className="relative aspect-square max-w-[600px] mx-auto">
-              {/* Circular flow arrows */}
-              <CircularFlowArrows />
-
               {/* Grid of cards */}
-              <div className="grid grid-cols-2 gap-8 p-8">
+              <div className="grid grid-cols-2 gap-16 p-8">
                 {WORKFLOW_STEPS.map((step, index) => (
                   <WorkflowStepCard key={step.id} step={step} index={index} />
                 ))}
+              </div>
+
+              {/* Circular flow arrows - positioned above cards */}
+              <div className="absolute inset-0 z-10 pointer-events-none">
+                <CircularFlowArrows />
               </div>
 
               {/* Central loop indicator */}

@@ -26,15 +26,15 @@ export const docsNavigation: NavItem[] = [
   {
     title: 'Getting Started',
     items: [
-      { title: 'Introduction', href: '/docs' },
-      { title: 'Quick Start', href: '/docs/quick-start' },
-      { title: 'Installation', href: '/docs/installation' },
+      { title: 'Introduction', href: '/docs/getting-started/introduction' },
+      { title: 'Quick Start', href: '/docs/getting-started/quick-start' },
+      { title: 'Installation', href: '/docs/getting-started/installation' },
     ],
   },
   {
     title: 'CLI Commands',
     items: [
-      { title: 'Overview', href: '/docs/cli' },
+      { title: 'Overview', href: '/docs/cli/overview' },
       { title: 'run', href: '/docs/cli/run' },
       { title: 'resume', href: '/docs/cli/resume' },
       { title: 'status', href: '/docs/cli/status' },
@@ -47,7 +47,7 @@ export const docsNavigation: NavItem[] = [
   {
     title: 'Configuration',
     items: [
-      { title: 'Overview', href: '/docs/configuration' },
+      { title: 'Overview', href: '/docs/configuration/overview' },
       { title: 'Config File', href: '/docs/configuration/config-file' },
       { title: 'Options Reference', href: '/docs/configuration/options' },
     ],
@@ -55,7 +55,7 @@ export const docsNavigation: NavItem[] = [
   {
     title: 'Plugins',
     items: [
-      { title: 'Overview', href: '/docs/plugins' },
+      { title: 'Overview', href: '/docs/plugins/overview' },
       {
         title: 'Agents',
         items: [
@@ -84,7 +84,7 @@ export const docsNavigation: NavItem[] = [
   {
     title: 'Troubleshooting',
     items: [
-      { title: 'Common Issues', href: '/docs/troubleshooting' },
+      { title: 'Common Issues', href: '/docs/troubleshooting/common-issues' },
       { title: 'Debugging', href: '/docs/troubleshooting/debugging' },
     ],
   },

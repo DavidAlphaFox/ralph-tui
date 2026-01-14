@@ -196,46 +196,6 @@ export function PrevNextNav({ currentPath, className = '' }: PrevNextNavProps) {
           <div className="hidden sm:block" />
         )}
       </div>
-
-      {/* Keyboard hint */}
-      <div
-        className={[
-          'mt-4 flex items-center justify-center gap-4',
-          'font-mono text-[10px]',
-          'text-fg-dim',
-        ].join(' ')}
-      >
-        <span className="flex items-center gap-1.5">
-          <kbd
-            className={[
-              'inline-flex items-center justify-center',
-              'min-w-[1.25rem] px-1.5 py-0.5',
-              'rounded',
-              'bg-bg-tertiary',
-              'border border-border-muted',
-              'text-fg-muted',
-            ].join(' ')}
-          >
-            ←
-          </kbd>
-          <span>Prev</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <kbd
-            className={[
-              'inline-flex items-center justify-center',
-              'min-w-[1.25rem] px-1.5 py-0.5',
-              'rounded',
-              'bg-bg-tertiary',
-              'border border-border-muted',
-              'text-fg-muted',
-            ].join(' ')}
-          >
-            →
-          </kbd>
-          <span>Next</span>
-        </span>
-      </div>
     </nav>
   );
 }

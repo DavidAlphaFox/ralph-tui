@@ -151,9 +151,9 @@ export function TableOfContents({ items, className = '' }: TableOfContentsProps)
         />
 
         <ul className="space-y-1 pl-4">
-          {items.map((item) => (
+          {items.map((item, index) => (
             <TocEntry
-              key={item.id}
+              key={`${item.id}-${index}`}
               item={item}
               activeId={activeId}
               onClick={handleClick}
@@ -232,9 +232,9 @@ function TocEntry({
       {/* Nested children (h3 under h2) */}
       {hasChildren && (
         <ul className="mt-1 space-y-1 border-l border-border-muted pl-3 ml-0.5">
-          {item.children!.map((child) => (
+          {item.children!.map((child, index) => (
             <TocEntry
-              key={child.id}
+              key={`${child.id}-${index}`}
               item={child}
               activeId={activeId}
               onClick={onClick}

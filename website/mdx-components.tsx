@@ -276,7 +276,6 @@ function Code({ children, ...props }: React.HTMLAttributes<HTMLElement>) {
         'bg-bg-tertiary',
         'font-mono text-sm',
         'text-accent-tertiary',
-        'border border-border-muted',
       ].join(' ')}
       {...props}
     >

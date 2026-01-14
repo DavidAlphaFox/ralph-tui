@@ -17,6 +17,7 @@ import {
   GitBranch,
   Terminal,
   Sparkles,
+  Heart,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Variants } from 'framer-motion';
@@ -109,6 +110,15 @@ const FEATURES: Feature[] = [
     accentColor: 'text-accent-secondary',
     glowColor: 'rgba(187, 154, 247, 0.35)',
   },
+  {
+    id: 'faithful-origins',
+    title: 'True to Origins',
+    description:
+      "Designed to be faithful to Geoffrey Huntley's original Ralph approach — autonomous agents working through task backlogs.",
+    icon: Heart,
+    accentColor: 'text-status-error',
+    glowColor: 'rgba(247, 118, 142, 0.35)',
+  },
 ];
 
 /**
@@ -160,7 +170,7 @@ function FeatureCard({ feature }: { feature: Feature }) {
     >
       {/* Hover glow effect */}
       <div
-        className="pointer-events-none absolute -inset-px rounded-lg opacity-0 blur-lg transition-opacity duration-300 group-hover:opacity-100"
+        className="pointer-events-none absolute -inset-px rounded-lg opacity-0 blur-lg transition-opacity duration-300 group-hover:opacity-50"
         style={{ backgroundColor: feature.glowColor }}
         aria-hidden="true"
       />
@@ -197,7 +207,7 @@ function FeatureCard({ feature }: { feature: Feature }) {
 
         {/* Corner accent decoration */}
         <div
-          className="pointer-events-none absolute right-0 top-0 h-12 w-12 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+          className="pointer-events-none absolute right-0 top-0 h-12 w-12 opacity-0 transition-opacity duration-300 group-hover:opacity-50"
           aria-hidden="true"
         >
           <svg
