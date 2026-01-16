@@ -337,6 +337,15 @@ export class ClaudeAgentPlugin extends BaseAgentPlugin {
   /**
    * Parse a Claude JSONL event and extract displayable content.
    * Returns formatted string for TUI display, or empty string if not displayable.
+   *
+   * Claude CLI stream-json format event types:
+   * - "assistant": AI responses with content[] containing text and tool_use blocks
+   * - "user": Tool results (contains file contents, command output) - SKIP for cleaner display
+   * - "system": Hooks, init data - SKIP
+   * - "result": Final result summary - SKIP (duplicates assistant content)
+   * - "error": Error messages - display
+   *
+   * We only display "assistant" events (text and tool calls) for clean output like opencode.
    */
   private parseClaudeEventForDisplay(jsonLine: string): string {
     if (!jsonLine || jsonLine.length === 0) return '';
@@ -344,22 +353,22 @@ export class ClaudeAgentPlugin extends BaseAgentPlugin {
     try {
       const event = JSON.parse(jsonLine) as Record<string, unknown>;
 
-      // Handle assistant messages with tool use
-      if (event.type === 'assistant' && event.tool) {
-        const tool = event.tool as { name?: string; input?: Record<string, unknown> };
-        if (tool.name) {
-          return formatToolCall(tool.name, tool.input);
+      // Only handle assistant messages - skip system, user (tool results), and result events
+      if (event.type === 'assistant' && event.message) {
+        const message = event.message as { content?: Array<Record<string, unknown>> };
+        if (message.content && Array.isArray(message.content)) {
+          const parts: string[] = [];
+          for (const block of message.content) {
+            if (block.type === 'text' && typeof block.text === 'string') {
+              parts.push(block.text);
+            } else if (block.type === 'tool_use' && typeof block.name === 'string') {
+              parts.push(formatToolCall(block.name, block.input as Record<string, unknown>));
+            }
+          }
+          if (parts.length > 0) {
+            return parts.join('');
+          }
         }
-      }
-
-      // Handle text content from assistant
-      if (event.type === 'assistant' && typeof event.message === 'string') {
-        return event.message;
-      }
-
-      // Handle result events (final output)
-      if (event.type === 'result' && typeof event.result === 'string') {
-        return event.result;
       }
 
       // Handle error events
@@ -370,13 +379,10 @@ export class ClaudeAgentPlugin extends BaseAgentPlugin {
         return '\n' + formatError(errorMsg) + '\n';
       }
 
+      // Skip all other event types (system, user, result) for clean output
       return '';
     } catch {
-      // Not valid JSON - return as-is if non-empty
-      const trimmed = jsonLine.trim();
-      if (trimmed.length > 0 && !trimmed.startsWith('{')) {
-        return trimmed + '\n';
-      }
+      // Not valid JSON - skip (don't pass through random text)
       return '';
     }
   }
