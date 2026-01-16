@@ -52,6 +52,16 @@ export class DroidAgentPlugin extends BaseAgentPlugin {
     };
   }
 
+  override getSandboxRequirements() {
+    return {
+      // Droid may store auth/config in these locations
+      authPaths: ['~/.droid', '~/.config/droid', '~/.config/gcloud'],
+      binaryPaths: ['/usr/local/bin', '~/.local/bin'],
+      runtimePaths: [],
+      requiresNetwork: true,
+    };
+  }
+
   override async initialize(config: Record<string, unknown>): Promise<void> {
     await super.initialize(config);
 
