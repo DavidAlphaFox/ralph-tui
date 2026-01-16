@@ -82,13 +82,17 @@ export class SandboxWrapper {
       }
     }
 
+    // Auth paths need read-write for OAuth token refresh
+    const authPaths = this.normalizePaths(this.requirements.authPaths, workDir);
     const readWritePaths = new Set<string>([
       workDir,
       ...this.normalizePaths(this.config.allowPaths ?? [], workDir),
+      ...authPaths,
     ]);
     const readOnlyPaths = new Set<string>([
       ...this.normalizePaths(this.config.readOnlyPaths ?? [], workDir),
-      ...this.normalizePaths(this.getRequirementPaths(), workDir),
+      ...this.normalizePaths(this.requirements.binaryPaths, workDir),
+      ...this.normalizePaths(this.requirements.runtimePaths, workDir),
     ]);
 
     for (const path of readWritePaths) {
@@ -176,17 +180,28 @@ export class SandboxWrapper {
     // Additional allowed paths (read-write)
     const allowPaths = this.normalizePaths(this.config.allowPaths ?? [], workDir);
     for (const path of allowPaths) {
-      if (path !== workDir) {
+      if (path !== workDir && existsSync(path)) {
+        lines.push(`(allow file-read* file-write* (subpath "${path}"))`);
+      }
+    }
+
+    // Auth paths need read-write for OAuth token refresh
+    lines.push('');
+    lines.push('; Auth paths (read-write for token refresh)');
+    const authPaths = this.normalizePaths(this.requirements.authPaths, workDir);
+    for (const path of authPaths) {
+      if (existsSync(path)) {
         lines.push(`(allow file-read* file-write* (subpath "${path}"))`);
       }
     }
     lines.push('');
 
-    // Read-only paths (from config and agent requirements)
-    lines.push('; Read-only paths (auth, runtime, config)');
+    // Read-only paths (binaries, runtime, config)
+    lines.push('; Read-only paths (binaries, runtime, config)');
     const readOnlyPaths = new Set<string>([
       ...this.normalizePaths(this.config.readOnlyPaths ?? [], workDir),
-      ...this.normalizePaths(this.getRequirementPaths(), workDir),
+      ...this.normalizePaths(this.requirements.binaryPaths, workDir),
+      ...this.normalizePaths(this.requirements.runtimePaths, workDir),
     ]);
     for (const path of readOnlyPaths) {
       if (existsSync(path)) {
@@ -195,14 +210,6 @@ export class SandboxWrapper {
     }
 
     return lines.join('\n');
-  }
-
-  private getRequirementPaths(): string[] {
-    return [
-      ...this.requirements.authPaths,
-      ...this.requirements.binaryPaths,
-      ...this.requirements.runtimePaths,
-    ];
   }
 
   private normalizePaths(paths: string[], cwd: string): string[] {
