@@ -560,9 +560,8 @@ export function formatDroidEventToSegments(message: DroidJsonlMessage): Formatte
 
 // Strip ANSI escape sequences from a string
 // These can appear when using pseudo-TTY wrappers like `script`
-// Matches: ESC[...letter, ESC]...BEL, bare [...letter (without ESC)
-// Includes SGR (Select Graphic Rendition) codes for both foreground and background colors
-const ANSI_REGEX = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB012]|\[\?[0-9;]*[a-zA-Z]|\x1b\[4[0-9;]*m|\x1b\[10[0-9;]*m/g;
+// Only matches sequences that start with ESC (\x1b) to avoid stripping regular text
+const ANSI_REGEX = /\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB012]/g;
 
 function stripAnsi(str: string): string {
   return str.replace(ANSI_REGEX, '');
