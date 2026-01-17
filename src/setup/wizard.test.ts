@@ -71,7 +71,7 @@ mock.module('../plugins/agents/registry.js', () => ({
       { id: 'droid', name: 'Droid', description: 'Factory Droid', version: '1.0.0' },
     ],
     createInstance: (id: string) => createMockAgentInstance(id, id),
-    hasPlugin: () => true,
+    hasPlugin: (name: string) => ['claude', 'opencode', 'droid'].includes(name),
     // Mock registerBuiltin to prevent errors when registerBuiltinAgents is called
     registerBuiltin: () => {},
   }),
