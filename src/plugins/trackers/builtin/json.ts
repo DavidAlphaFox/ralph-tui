@@ -75,6 +75,8 @@ interface PrdJson {
     createdAt?: string;
     updatedAt?: string;
     version?: string;
+    /** Path to the source PRD markdown file (relative to prd.json or absolute) */
+    sourcePrd?: string;
   };
 }
 
@@ -631,6 +633,155 @@ export class JsonTrackerPlugin extends BaseTrackerPlugin {
         console.error('Failed to read prd.json for getEpics:', err);
       }
       return [];
+    }
+  }
+
+  /**
+   * Get the prompt template for the JSON tracker.
+   * Context-first structure: PRD → Patterns → Task → Workflow
+   */
+  override getTemplate(): string {
+    return `{{!-- Full PRD for project context (agent studies this first) --}}
+{{#if prdContent}}
+## PRD: {{prdName}}
+{{#if prdDescription}}
+{{prdDescription}}
+{{/if}}
+
+### Progress: {{prdCompletedCount}}/{{prdTotalCount}} stories complete
+
+<details>
+<summary>Full PRD Document (click to expand)</summary>
+
+{{prdContent}}
+
+</details>
+{{/if}}
+
+{{!-- Learnings from previous iterations (patterns first) --}}
+{{#if codebasePatterns}}
+## Codebase Patterns (Study These First)
+{{codebasePatterns}}
+{{/if}}
+
+{{!-- Task details --}}
+## Your Task: {{taskId}} - {{taskTitle}}
+
+{{#if taskDescription}}
+### Description
+{{taskDescription}}
+{{/if}}
+
+{{#if acceptanceCriteria}}
+### Acceptance Criteria
+{{acceptanceCriteria}}
+{{/if}}
+
+{{#if notes}}
+### Notes
+{{notes}}
+{{/if}}
+
+{{#if dependsOn}}
+**Prerequisites**: {{dependsOn}}
+{{/if}}
+
+{{#if recentProgress}}
+## Recent Progress
+{{recentProgress}}
+{{/if}}
+
+## Workflow
+1. Study the PRD context above to understand the bigger picture
+2. Review Codebase Patterns to avoid past mistakes
+3. Implement this single story following acceptance criteria
+4. Run quality checks: typecheck, lint, etc.
+5. Commit with message: \`feat: {{taskId}} - {{taskTitle}}\`
+6. Document learnings (see below)
+7. Signal completion
+
+## Before Completing
+APPEND to \`.ralph-tui/progress.md\`:
+\`\`\`
+## [Date] - {{taskId}}
+- What was implemented
+- Files changed
+- **Learnings:**
+  - Patterns discovered
+  - Gotchas encountered
+---
+\`\`\`
+
+If you discovered a **reusable pattern**, also add it to the \`## Codebase Patterns\` section at the TOP of progress.md.
+
+## Stop Condition
+**IMPORTANT**: If the work is already complete (implemented in a previous iteration or already exists), verify it meets the acceptance criteria and signal completion immediately.
+
+When finished (or if already complete), signal completion with:
+<promise>COMPLETE</promise>
+`;
+  }
+
+  /**
+   * Get the source PRD markdown content.
+   * Reads from metadata.sourcePrd path if specified.
+   * @returns The PRD markdown content, or empty string if not available
+   */
+  async getSourcePrdContent(): Promise<string> {
+    if (!this.filePath) {
+      return '';
+    }
+
+    try {
+      const prd = await this.readPrd();
+      const sourcePrdPath = prd.metadata?.sourcePrd;
+
+      if (!sourcePrdPath) {
+        return '';
+      }
+
+      // Resolve path relative to prd.json location
+      const prdDir = resolve(this.filePath, '..');
+      const fullPath = sourcePrdPath.startsWith('/')
+        ? sourcePrdPath
+        : resolve(prdDir, sourcePrdPath);
+
+      const content = await readFile(fullPath, 'utf-8');
+      return content;
+    } catch {
+      // Source PRD not found or not readable - this is fine, it's optional
+      return '';
+    }
+  }
+
+  /**
+   * Get PRD context for template rendering.
+   * Returns name, description, source markdown content, and completion stats.
+   */
+  async getPrdContext(): Promise<{
+    name: string;
+    description?: string;
+    content: string;
+    completedCount: number;
+    totalCount: number;
+  } | null> {
+    if (!this.filePath) {
+      return null;
+    }
+
+    try {
+      const prd = await this.readPrd();
+      const content = await this.getSourcePrdContent();
+
+      return {
+        name: prd.name,
+        description: prd.description,
+        content,
+        completedCount: prd.userStories.filter((s) => s.passes).length,
+        totalCount: prd.userStories.length,
+      };
+    } catch {
+      return null;
     }
   }
 }

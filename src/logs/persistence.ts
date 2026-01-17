@@ -17,6 +17,7 @@ import type {
   IterationLog,
   IterationLogMetadata,
   IterationLogSummary,
+  IterationSummary,
   LogFilterOptions,
   LogCleanupOptions,
   LogCleanupResult,
@@ -91,6 +92,9 @@ export interface BuildMetadataOptions {
 
   /** Summary of how iteration completed */
   completionSummary?: string;
+
+  /** Structured summary of what was accomplished (for context recovery) */
+  summary?: IterationSummary;
 }
 
 /**
@@ -105,11 +109,14 @@ export function buildMetadata(
   let agentSwitches: AgentSwitchEntry[] | undefined;
   let completionSummary: string | undefined;
 
+  let summary: IterationSummary | undefined;
+
   if (configOrOptions && 'agentSwitches' in configOrOptions) {
     // New options object
     config = configOrOptions.config;
     agentSwitches = configOrOptions.agentSwitches;
     completionSummary = configOrOptions.completionSummary;
+    summary = configOrOptions.summary;
   } else {
     // Old config-only signature for backward compatibility
     config = configOrOptions as Partial<RalphConfig> | undefined;
@@ -132,6 +139,7 @@ export function buildMetadata(
     epicId: config?.epicId,
     agentSwitches: agentSwitches && agentSwitches.length > 0 ? agentSwitches : undefined,
     completionSummary,
+    summary,
   };
 }
 
@@ -143,6 +151,50 @@ function formatMetadataHeader(metadata: IterationLogMetadata): string {
 
   lines.push(`# Iteration ${metadata.iteration} Log`);
   lines.push('');
+
+  // Summary section for context recovery (placed first for easy access)
+  if (metadata.summary) {
+    const { whatWasDone, filesChanged, commitHash, learnings } = metadata.summary;
+
+    lines.push('## Summary (For Context Recovery)');
+    lines.push(`**Task:** ${metadata.taskId} - ${metadata.taskTitle}`);
+    if (commitHash) {
+      lines.push(`**Commit:** ${commitHash}`);
+    }
+    lines.push(`**Status:** ${metadata.taskCompleted ? '✅ Completed' : '❌ Incomplete'}`);
+    lines.push('');
+
+    if (whatWasDone.length > 0) {
+      lines.push('### What Was Done');
+      for (const item of whatWasDone) {
+        lines.push(`- ${item}`);
+      }
+      lines.push('');
+    }
+
+    if (filesChanged.length > 0) {
+      lines.push('### Files Changed');
+      for (const file of filesChanged.slice(0, 20)) { // Limit to 20 files
+        lines.push(`- ${file}`);
+      }
+      if (filesChanged.length > 20) {
+        lines.push(`- ... and ${filesChanged.length - 20} more`);
+      }
+      lines.push('');
+    }
+
+    if (learnings.length > 0) {
+      lines.push('### Learnings');
+      for (const learning of learnings) {
+        lines.push(`- ${learning}`);
+      }
+      lines.push('');
+    }
+
+    lines.push('---');
+    lines.push('');
+  }
+
   lines.push('## Metadata');
   lines.push('');
   lines.push(`- **Task ID**: ${metadata.taskId}`);
@@ -205,6 +257,104 @@ function formatDuration(ms: number): string {
     return `${minutes}m ${seconds % 60}s`;
   }
   return `${seconds}s`;
+}
+
+/**
+ * Patterns to extract summary content from agent output.
+ */
+const SUMMARY_PATTERNS = {
+  /** Pattern for extracting learnings/insights */
+  learnings: /(?:\*\*Learnings?\*\*:?|Learnings?:)\s*([\s\S]*?)(?=\n##|\n\*\*|$)/gi,
+  /** Pattern for "what was done" bullet points */
+  whatWasDone: /(?:What was (?:done|implemented)|Completed|Implemented):?\s*([\s\S]*?)(?=\n##|\n\*\*|$)/gi,
+  /** Pattern for insight blocks (★ Insight format) */
+  insights: /`?★ Insight[─\s]*`?\n([\s\S]*?)\n`?─+`?/gi,
+};
+
+/**
+ * Extract what was accomplished from agent output.
+ * Looks for patterns like "What was done:", bullet points, etc.
+ */
+function extractWhatWasDone(output: string): string[] {
+  const items: string[] = [];
+
+  // Look for explicit "What was done" sections
+  let match;
+  SUMMARY_PATTERNS.whatWasDone.lastIndex = 0;
+  while ((match = SUMMARY_PATTERNS.whatWasDone.exec(output)) !== null) {
+    const content = match[1]?.trim();
+    if (content) {
+      // Split by bullet points
+      const lines = content.split('\n')
+        .map((l) => l.replace(/^[-*•]\s*/, '').trim())
+        .filter((l) => l.length > 0 && l.length < 200);
+      items.push(...lines);
+    }
+  }
+
+  // If no explicit section, look for commit message patterns
+  if (items.length === 0) {
+    const commitMatch = output.match(/git commit.*?-m\s*["']([^"']+)["']/i);
+    if (commitMatch?.[1]) {
+      items.push(commitMatch[1]);
+    }
+  }
+
+  return items.slice(0, 10); // Limit to 10 items
+}
+
+/**
+ * Extract learnings from agent output.
+ * Looks for patterns like "**Learnings:**", insight blocks, etc.
+ */
+function extractLearnings(output: string): string[] {
+  const learnings: string[] = [];
+
+  // Look for explicit learnings sections
+  let match;
+  SUMMARY_PATTERNS.learnings.lastIndex = 0;
+  while ((match = SUMMARY_PATTERNS.learnings.exec(output)) !== null) {
+    const content = match[1]?.trim();
+    if (content) {
+      const lines = content.split('\n')
+        .map((l) => l.replace(/^[-*•]\s*/, '').trim())
+        .filter((l) => l.length > 10 && l.length < 300);
+      learnings.push(...lines);
+    }
+  }
+
+  // Also check for ★ Insight blocks
+  SUMMARY_PATTERNS.insights.lastIndex = 0;
+  while ((match = SUMMARY_PATTERNS.insights.exec(output)) !== null) {
+    const insight = match[1]?.trim();
+    if (insight && insight.length > 10) {
+      learnings.push(insight);
+    }
+  }
+
+  // Deduplicate
+  return [...new Set(learnings)].slice(0, 5); // Limit to 5 learnings
+}
+
+/**
+ * Extract iteration summary from agent output and git state.
+ * This creates a structured summary useful for context recovery.
+ *
+ * @param output Agent stdout output
+ * @param commitHash Optional git commit hash (from git rev-parse --short HEAD)
+ * @param filesChanged Optional list of changed files (from git diff --name-only)
+ */
+export function extractIterationSummary(
+  output: string,
+  commitHash?: string,
+  filesChanged?: string[]
+): IterationSummary {
+  return {
+    whatWasDone: extractWhatWasDone(output),
+    filesChanged: filesChanged ?? [],
+    commitHash,
+    learnings: extractLearnings(output),
+  };
 }
 
 /**
@@ -288,6 +438,9 @@ export interface SaveIterationLogOptions {
 
   /** Summary of how iteration completed (e.g., 'Completed on fallback (opencode) due to rate limit') */
   completionSummary?: string;
+
+  /** Structured summary of what was accomplished (for context recovery) */
+  summary?: IterationSummary;
 }
 
 /**
@@ -312,6 +465,7 @@ export async function saveIterationLog(
   let subagentTrace: SubagentTrace | undefined;
   let agentSwitches: AgentSwitchEntry[] | undefined;
   let completionSummary: string | undefined;
+  let summary: IterationSummary | undefined;
 
   if (options && 'subagentTrace' in options) {
     // New options object
@@ -320,6 +474,7 @@ export async function saveIterationLog(
     subagentTrace = saveOptions.subagentTrace;
     agentSwitches = saveOptions.agentSwitches;
     completionSummary = saveOptions.completionSummary;
+    summary = saveOptions.summary;
   } else {
     // Old config-only signature for backward compatibility
     config = options as Partial<RalphConfig> | undefined;
@@ -332,6 +487,7 @@ export async function saveIterationLog(
     config,
     agentSwitches,
     completionSummary,
+    summary,
   });
   const filename = generateLogFilename(result.iteration, result.task.id);
   const filePath = join(getIterationsDir(cwd, outputDir), filename);

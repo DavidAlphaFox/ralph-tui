@@ -351,6 +351,13 @@ export interface TrackerPlugin {
    * Called when Ralph TUI shuts down.
    */
   dispose(): Promise<void>;
+
+  /**
+   * Get the prompt template for this tracker.
+   * Each tracker provides its own Handlebars template for rendering prompts.
+   * @returns The Handlebars template string
+   */
+  getTemplate(): string;
 }
 
 /**

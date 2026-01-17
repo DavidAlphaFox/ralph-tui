@@ -100,22 +100,25 @@ export function getUserPromptPath(trackerType: BuiltinTemplateType): string {
 }
 
 /**
- * Load a template from a custom path or fall back to user config or built-in.
+ * Load a template from a custom path or fall back to user config, tracker, or built-in.
  *
  * Resolution order:
  * 1. customPath (explicit --prompt argument or config file prompt_template)
  * 2. ~/.config/ralph-tui/{mode-specific}.md (user config directory)
- * 3. Built-in template (bundled default)
+ * 3. trackerTemplate (from tracker plugin's getTemplate())
+ * 4. Built-in template (bundled default - fallback for backward compatibility)
  *
  * @param customPath Optional path to custom template
  * @param trackerType Tracker type for user config and built-in template fallback
  * @param cwd Working directory for relative path resolution
+ * @param trackerTemplate Optional template content from the tracker plugin
  * @returns The template load result
  */
 export function loadTemplate(
   customPath: string | undefined,
   trackerType: BuiltinTemplateType,
-  cwd: string
+  cwd: string,
+  trackerTemplate?: string
 ): TemplateLoadResult {
   // 1. Try explicit custom template first (from --prompt or config)
   if (customPath) {
@@ -159,10 +162,19 @@ export function loadTemplate(
       };
     }
   } catch {
-    // Silently fall through to built-in template
+    // Silently fall through to tracker or built-in template
   }
 
-  // 3. Use built-in template
+  // 3. Use tracker-provided template (from plugin's getTemplate())
+  if (trackerTemplate) {
+    return {
+      success: true,
+      content: trackerTemplate,
+      source: `tracker:${trackerType}`,
+    };
+  }
+
+  // 4. Fallback to built-in template (for backward compatibility)
   const content = getBuiltinTemplate(trackerType);
   return {
     success: true,
@@ -220,18 +232,69 @@ function getAcceptanceCriteria(task: TrackerTask): string {
 }
 
 /**
+ * Extended context for building template variables.
+ * Includes PRD information, patterns, and selection context.
+ */
+export interface ExtendedTemplateContext {
+  /** Recent progress summary from previous iterations */
+  recentProgress?: string;
+
+  /** Codebase patterns from progress.md */
+  codebasePatterns?: string;
+
+  /** PRD context for full project visibility */
+  prd?: {
+    name: string;
+    description?: string;
+    content: string; // The source PRD markdown (full context for agent to study)
+    completedCount: number;
+    totalCount: number;
+  };
+
+  /** Selection reason (for beads-bv tracker) */
+  selectionReason?: string;
+}
+
+/**
  * Build template variables from task and config.
  * @param task The current task
  * @param config The ralph configuration
  * @param epic Optional epic information
+ * @param extended Extended context including progress, patterns, PRD data
  * @returns The flattened template variables
  */
 export function buildTemplateVariables(
   task: TrackerTask,
   config: Partial<RalphConfig>,
   epic?: { id: string; title: string; description?: string },
-  recentProgress?: string
+  extended?: string | ExtendedTemplateContext
 ): TemplateVariables {
+  // Handle backward compatibility: if extended is a string, it's recentProgress
+  let recentProgress = '';
+  let codebasePatterns = '';
+  let prdName = '';
+  let prdDescription = '';
+  let prdContent = '';
+  let prdCompletedCount = '0';
+  let prdTotalCount = '0';
+  let selectionReason = '';
+
+  if (typeof extended === 'string') {
+    recentProgress = extended;
+  } else if (extended) {
+    recentProgress = extended.recentProgress ?? '';
+    codebasePatterns = extended.codebasePatterns ?? '';
+    selectionReason = extended.selectionReason ?? '';
+
+    if (extended.prd) {
+      prdName = extended.prd.name;
+      prdDescription = extended.prd.description ?? '';
+      prdContent = extended.prd.content;
+      prdCompletedCount = String(extended.prd.completedCount);
+      prdTotalCount = String(extended.prd.totalCount);
+    }
+  }
+
   return {
     taskId: task.id,
     taskTitle: task.title,
@@ -252,8 +315,18 @@ export function buildTemplateVariables(
     currentDate: new Date().toISOString().split('T')[0],
     currentTimestamp: new Date().toISOString(),
     notes: (task.metadata?.notes as string) ?? '',
-    recentProgress: recentProgress ?? '',
+    recentProgress,
     beadsDbPath: computeBeadsDbPath(config),
+    // New PRD context variables
+    prdName,
+    prdDescription,
+    prdContent,
+    prdCompletedCount,
+    prdTotalCount,
+    // New patterns variable
+    codebasePatterns,
+    // New selection context variable
+    selectionReason,
   };
 }
 
@@ -321,20 +394,22 @@ function compileTemplate(
  * @param config The ralph configuration
  * @param epic Optional epic information
  * @param recentProgress Optional recent progress summary from previous iterations
+ * @param trackerTemplate Optional template from the tracker plugin's getTemplate()
  * @returns The render result with the prompt or error
  */
 export function renderPrompt(
   task: TrackerTask,
   config: RalphConfig,
   epic?: { id: string; title: string; description?: string },
-  recentProgress?: string
+  recentProgress?: string,
+  trackerTemplate?: string
 ): TemplateRenderResult {
   // Determine template to use
   const trackerType = getTemplateTypeFromPlugin(config.tracker.plugin);
   const customPath = config.promptTemplate;
 
-  // Load the template
-  const loadResult = loadTemplate(customPath, trackerType, config.cwd);
+  // Load the template (uses tracker template if no custom/user config override)
+  const loadResult = loadTemplate(customPath, trackerType, config.cwd, trackerTemplate);
   if (!loadResult.success || !loadResult.content) {
     return {
       success: false,

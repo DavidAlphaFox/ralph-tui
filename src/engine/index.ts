@@ -61,13 +61,21 @@ const PRIMARY_RECOVERY_TEST_PROMPT = 'Reply with just the word "ok".';
  * Build prompt for the agent based on task using the template system.
  * Falls back to a hardcoded default if template rendering fails.
  * Includes recent progress from previous iterations for context.
+ * Uses the tracker's getTemplate() method for plugin-owned templates.
  */
-async function buildPrompt(task: TrackerTask, config: RalphConfig): Promise<string> {
+async function buildPrompt(
+  task: TrackerTask,
+  config: RalphConfig,
+  tracker?: TrackerPlugin
+): Promise<string> {
   // Load recent progress for context (last 5 iterations)
   const recentProgress = await getRecentProgressSummary(config.cwd, 5);
 
-  // Use the template system
-  const result = renderPrompt(task, config, undefined, recentProgress);
+  // Get template from tracker plugin (new architecture: templates owned by plugins)
+  const trackerTemplate = tracker?.getTemplate();
+
+  // Use the template system (tracker template used if no custom/user override)
+  const result = renderPrompt(task, config, undefined, recentProgress, trackerTemplate);
 
   if (result.success && result.prompt) {
     return result.prompt;
@@ -724,8 +732,8 @@ export class ExecutionEngine {
       iteration,
     });
 
-    // Build prompt (includes recent progress context)
-    const prompt = await buildPrompt(task, this.config);
+    // Build prompt (includes recent progress context + tracker-owned template)
+    const prompt = await buildPrompt(task, this.config, this.tracker ?? undefined);
 
     // Build agent flags
     const flags: string[] = [];
