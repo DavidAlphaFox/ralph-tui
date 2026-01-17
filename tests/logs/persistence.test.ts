@@ -19,7 +19,10 @@ import {
   loadIterationLog,
   getIterationsDir,
   generateLogFilename,
+  __test__,
 } from '../../src/logs/persistence.js';
+
+const { formatMetadataHeader, parseMetadataHeader, formatDuration } = __test__;
 import type { IterationResult } from '../../src/engine/types.js';
 import type { SandboxConfig } from '../../src/config/types.js';
 
@@ -373,6 +376,229 @@ describe('generateLogFilename', () => {
   test('sanitizes task IDs with special characters', () => {
     const filename = generateLogFilename(1, 'beads-123/subtask');
     expect(filename).toBe('iteration-001-beads-123-subtask.log');
+  });
+});
+
+describe('formatDuration', () => {
+  test('formats seconds only', () => {
+    expect(formatDuration(5000)).toBe('5s');
+    expect(formatDuration(45000)).toBe('45s');
+  });
+
+  test('formats minutes and seconds', () => {
+    expect(formatDuration(65000)).toBe('1m 5s');
+    expect(formatDuration(125000)).toBe('2m 5s');
+    expect(formatDuration(3599000)).toBe('59m 59s');
+  });
+
+  test('formats hours, minutes, and seconds', () => {
+    expect(formatDuration(3600000)).toBe('1h 0m 0s');
+    expect(formatDuration(3661000)).toBe('1h 1m 1s');
+    expect(formatDuration(7325000)).toBe('2h 2m 5s');
+  });
+});
+
+describe('formatMetadataHeader', () => {
+  test('formats basic metadata', () => {
+    const metadata = buildMetadata(createTestIterationResult(), { config: {} });
+    const header = formatMetadataHeader(metadata);
+
+    expect(header).toContain('# Iteration 1 Log');
+    expect(header).toContain('**Task ID**: test-task-1');
+    expect(header).toContain('**Task Title**: Test Task');
+    expect(header).toContain('**Status**: completed');
+    expect(header).toContain('**Task Completed**: Yes');
+  });
+
+  test('includes description when present', () => {
+    const result = createTestIterationResult({
+      task: {
+        id: 'test-task-1',
+        title: 'Test Task',
+        description: 'A test description',
+        status: 'in_progress',
+        priority: 2,
+      },
+    });
+    const metadata = buildMetadata(result, { config: {} });
+    const header = formatMetadataHeader(metadata);
+
+    expect(header).toContain('**Description**: A test description');
+  });
+
+  test('truncates long descriptions', () => {
+    const longDesc = 'x'.repeat(250);
+    const result = createTestIterationResult({
+      task: {
+        id: 'test-task-1',
+        title: 'Test Task',
+        description: longDesc,
+        status: 'in_progress',
+        priority: 2,
+      },
+    });
+    const metadata = buildMetadata(result, { config: {} });
+    const header = formatMetadataHeader(metadata);
+
+    expect(header).toContain('**Description**: ' + 'x'.repeat(200) + '...');
+  });
+
+  test('includes error when present', () => {
+    const result = createTestIterationResult({ error: 'Something went wrong' });
+    const metadata = buildMetadata(result, { config: {} });
+    const header = formatMetadataHeader(metadata);
+
+    expect(header).toContain('**Error**: Something went wrong');
+  });
+
+  test('includes agent and model when present', () => {
+    const metadata = buildMetadata(createTestIterationResult(), {
+      config: {
+        agent: { name: 'claude', plugin: 'claude', options: {} },
+        model: 'claude-sonnet-4-20250514',
+      },
+    });
+    const header = formatMetadataHeader(metadata);
+
+    expect(header).toContain('**Agent**: claude');
+    expect(header).toContain('**Model**: claude-sonnet-4-20250514');
+  });
+
+  test('includes epicId when present', () => {
+    const metadata = buildMetadata(createTestIterationResult(), {
+      config: { epicId: 'epic-123' },
+    });
+    const header = formatMetadataHeader(metadata);
+
+    expect(header).toContain('**Epic**: epic-123');
+  });
+
+  test('includes sandbox configuration', () => {
+    const metadata = buildMetadata(createTestIterationResult(), {
+      config: {},
+      sandboxConfig: { enabled: true, mode: 'bwrap', network: false },
+      resolvedSandboxMode: 'bwrap',
+    });
+    const header = formatMetadataHeader(metadata);
+
+    expect(header).toContain('**Sandbox Mode**: bwrap');
+    expect(header).toContain('**Sandbox Network**: Disabled');
+  });
+
+  test('formats auto sandbox mode with resolved value', () => {
+    const metadata = buildMetadata(createTestIterationResult(), {
+      config: {},
+      sandboxConfig: { enabled: true, mode: 'auto', network: true },
+      resolvedSandboxMode: 'sandbox-exec',
+    });
+    const header = formatMetadataHeader(metadata);
+
+    expect(header).toContain('**Sandbox Mode**: auto (sandbox-exec)');
+    expect(header).toContain('**Sandbox Network**: Enabled');
+  });
+
+  test('includes completion summary when present', () => {
+    const metadata = buildMetadata(createTestIterationResult(), {
+      config: {},
+      completionSummary: 'Completed successfully',
+    });
+    const header = formatMetadataHeader(metadata);
+
+    expect(header).toContain('**Completion Summary**: Completed successfully');
+  });
+
+  test('includes agent switches section', () => {
+    const metadata = buildMetadata(createTestIterationResult(), {
+      config: {},
+      agentSwitches: [
+        { from: 'claude', to: 'opencode', reason: 'fallback', at: '2024-01-15T10:01:00.000Z' },
+        { from: 'opencode', to: 'claude', reason: 'primary', at: '2024-01-15T10:02:00.000Z' },
+      ],
+    });
+    const header = formatMetadataHeader(metadata);
+
+    expect(header).toContain('## Agent Switches');
+    expect(header).toContain('**Switched to fallback**: claude → opencode');
+    expect(header).toContain('**Recovered to primary**: opencode → claude');
+  });
+});
+
+describe('parseMetadataHeader', () => {
+  test('round-trips metadata through format and parse', () => {
+    const result = createTestIterationResult();
+    const original = buildMetadata(result, {
+      config: {
+        agent: { name: 'claude', plugin: 'claude', options: {} },
+        model: 'claude-sonnet-4-20250514',
+      },
+    });
+    const header = formatMetadataHeader(original);
+    const parsed = parseMetadataHeader(header);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed!.iteration).toBe(original.iteration);
+    expect(parsed!.taskId).toBe(original.taskId);
+    expect(parsed!.taskTitle).toBe(original.taskTitle);
+    expect(parsed!.status).toBe(original.status);
+    expect(parsed!.taskCompleted).toBe(original.taskCompleted);
+    expect(parsed!.agentPlugin).toBe(original.agentPlugin);
+    expect(parsed!.model).toBe(original.model);
+  });
+
+  test('parses sandbox configuration', () => {
+    const original = buildMetadata(createTestIterationResult(), {
+      config: {},
+      sandboxConfig: { enabled: true, mode: 'bwrap', network: false },
+      resolvedSandboxMode: 'bwrap',
+    });
+    const header = formatMetadataHeader(original);
+    const parsed = parseMetadataHeader(header);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed!.sandboxMode).toBe('bwrap');
+    expect(parsed!.sandboxNetwork).toBe(false);
+  });
+
+  test('parses auto sandbox mode with resolved value', () => {
+    const original = buildMetadata(createTestIterationResult(), {
+      config: {},
+      sandboxConfig: { enabled: true, mode: 'auto', network: true },
+      resolvedSandboxMode: 'sandbox-exec',
+    });
+    const header = formatMetadataHeader(original);
+    const parsed = parseMetadataHeader(header);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed!.sandboxMode).toBe('auto');
+    expect(parsed!.resolvedSandboxMode).toBe('sandbox-exec');
+    expect(parsed!.sandboxNetwork).toBe(true);
+  });
+
+  test('parses error field', () => {
+    const original = buildMetadata(createTestIterationResult({ error: 'Test error' }), { config: {} });
+    const header = formatMetadataHeader(original);
+    const parsed = parseMetadataHeader(header);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed!.error).toBe('Test error');
+  });
+
+  test('parses epicId', () => {
+    const original = buildMetadata(createTestIterationResult(), {
+      config: { epicId: 'epic-456' },
+    });
+    const header = formatMetadataHeader(original);
+    const parsed = parseMetadataHeader(header);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed!.epicId).toBe('epic-456');
+  });
+
+  test('returns null for invalid header', () => {
+    const parsed = parseMetadataHeader('not a valid header');
+    // Should return metadata with default values, not null
+    expect(parsed).not.toBeNull();
+    expect(parsed!.iteration).toBe(0);
   });
 });
 

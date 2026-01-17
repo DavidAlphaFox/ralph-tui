@@ -782,3 +782,11 @@ function computeTraceStats(states: SubagentState[]): SubagentTraceStats {
     maxDepth,
   };
 }
+
+// Test exports - internal functions exposed for unit testing
+// These are not part of the public API and may change without notice
+export const __test__ = {
+  formatMetadataHeader,
+  parseMetadataHeader,
+  formatDuration,
+};
