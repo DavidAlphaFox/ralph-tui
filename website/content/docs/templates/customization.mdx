@@ -203,9 +203,28 @@ Signal <promise>COMPLETE</promise> when done.
 
 ### Verbose Template with Full Context
 
-For maximum context injection:
+For maximum context injection (includes PRD, patterns, and progress):
 
 ```handlebars
+{{!-- PRD Context (helps agent understand the bigger picture) --}}
+{{#if prdContent}}
+## PRD: {{prdName}}
+{{#if prdDescription}}{{prdDescription}}{{/if}}
+
+### Progress: {{prdCompletedCount}}/{{prdTotalCount}} tasks complete
+
+<details>
+<summary>Full PRD Document</summary>
+{{prdContent}}
+</details>
+{{/if}}
+
+{{!-- Learnings from previous iterations --}}
+{{#if codebasePatterns}}
+## Codebase Patterns (Study First)
+{{codebasePatterns}}
+{{/if}}
+
 ## Task Context
 - **ID**: {{taskId}}
 - **Type**: {{type}}
@@ -258,9 +277,11 @@ Completing this task will unblock the above.
 {{/if}}
 
 ## Instructions
-1. Implement the requirements
-2. Run quality checks
-3. Commit changes
+1. Study PRD and patterns above for context
+2. Implement the requirements
+3. Run quality checks
+4. Commit changes
+5. Document learnings in `.ralph-tui/progress.md`
 
 When finished, signal completion with:
 <promise>COMPLETE</promise>

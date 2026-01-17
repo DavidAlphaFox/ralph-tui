@@ -477,6 +477,21 @@ Done? <promise>COMPLETE</promise>
 ### Maximum Context
 
 ```handlebars
+{{#if prdContent}}
+## PRD: {{prdName}}
+{{prdDescription}}
+### Progress: {{prdCompletedCount}}/{{prdTotalCount}} complete
+<details>
+<summary>Full PRD</summary>
+{{prdContent}}
+</details>
+{{/if}}
+
+{{#if codebasePatterns}}
+## Codebase Patterns
+{{codebasePatterns}}
+{{/if}}
+
 # {{taskTitle}}
 
 ## Metadata
@@ -515,6 +530,11 @@ Unblocks: {{blocks}}
 {{#if recentProgress}}
 ## Previous Progress
 {{recentProgress}}
+{{/if}}
+
+{{#if selectionReason}}
+## Selection Reason
+{{selectionReason}}
 {{/if}}
 
 ## Completion
