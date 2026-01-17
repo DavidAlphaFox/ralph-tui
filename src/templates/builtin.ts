@@ -95,7 +95,7 @@ export const BEADS_TEMPLATE = `{{!-- Full PRD for project context (agent studies
 
 ## Workflow
 1. Study the PRD context above to understand the bigger picture (if available)
-2. Review Codebase Patterns to avoid past mistakes
+2. Study \`.ralph-tui/progress.md\` to understand overall status, implementation progress, and learnings including codebase patterns and gotchas
 3. Implement the requirements (stay on current branch)
 4. Run your project's quality checks (typecheck, lint, etc.)
 5. Commit: \`feat: {{taskId}} - {{taskTitle}}\`
@@ -189,7 +189,7 @@ Completing this task will unblock: {{blocks}}
 
 ## Workflow
 1. Study the PRD context above to understand the bigger picture (if available)
-2. Review Codebase Patterns to avoid past mistakes
+2. Study \`.ralph-tui/progress.md\` to understand overall status, implementation progress, and learnings including codebase patterns and gotchas
 3. Implement the requirements (stay on current branch)
 4. Run your project's quality checks (typecheck, lint, etc.)
 5. Commit: \`feat: {{taskId}} - {{taskTitle}}\`
@@ -274,7 +274,7 @@ export const JSON_TEMPLATE = `{{!-- Full PRD for project context (agent studies 
 
 ## Workflow
 1. Study the PRD context above to understand the bigger picture
-2. Review Codebase Patterns to avoid past mistakes
+2. Study \`.ralph-tui/progress.md\` to understand overall status, implementation progress, and learnings including codebase patterns and gotchas
 3. Implement this single story following acceptance criteria
 4. Run quality checks: typecheck, lint, etc.
 5. Commit with message: \`feat: {{taskId}} - {{taskTitle}}\`
