@@ -36,7 +36,7 @@ import type { SubagentEvent } from '../plugins/agents/tracing/types.js';
 import { ClaudeAgentPlugin } from '../plugins/agents/builtin/claude.js';
 import { createDroidStreamingJsonlParser, isDroidJsonlMessage, toClaudeJsonlMessages } from '../plugins/agents/droid/outputParser.js';
 import { updateSessionIteration, updateSessionStatus, updateSessionMaxIterations } from '../session/index.js';
-import { saveIterationLog, buildSubagentTrace, createProgressEntry, appendProgress, getRecentProgressSummary } from '../logs/index.js';
+import { saveIterationLog, buildSubagentTrace, createProgressEntry, appendProgress, getRecentProgressSummary, getCodebasePatternsForPrompt } from '../logs/index.js';
 import type { AgentSwitchEntry } from '../logs/index.js';
 import { renderPrompt } from '../templates/index.js';
 
@@ -72,15 +72,19 @@ async function buildPrompt(
   // Load recent progress for context (last 5 iterations)
   const recentProgress = await getRecentProgressSummary(config.cwd, 5);
 
+  // Load codebase patterns from progress.md (if any exist)
+  const codebasePatterns = await getCodebasePatternsForPrompt(config.cwd);
+
   // Get template from tracker plugin (new architecture: templates owned by plugins)
   const trackerTemplate = tracker?.getTemplate();
 
   // Get PRD context if the tracker supports it
   const prdContext = await tracker?.getPrdContext?.();
 
-  // Build extended template context with PRD data
+  // Build extended template context with PRD data and patterns
   const extendedContext = {
     recentProgress,
+    codebasePatterns,
     prd: prdContext ?? undefined,
   };
 
@@ -324,12 +328,16 @@ export class ExecutionEngine {
     // Get recent progress summary for context
     const recentProgress = await getRecentProgressSummary(this.config.cwd, 5);
 
+    // Get codebase patterns from progress.md (if any exist)
+    const codebasePatterns = await getCodebasePatternsForPrompt(this.config.cwd);
+
     // Get PRD context if the tracker supports it
     const prdContext = await this.tracker.getPrdContext?.();
 
-    // Build extended template context with PRD data
+    // Build extended template context with PRD data and patterns
     const extendedContext = {
       recentProgress,
+      codebasePatterns,
       prd: prdContext ?? undefined,
     };
 
