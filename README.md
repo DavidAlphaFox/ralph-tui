@@ -139,8 +139,9 @@ ralph-tui create-prd --output ./docs
 | `s` | Start execution |
 | `p` | Pause/Resume |
 | `d` | Toggle dashboard |
-| `i` | Toggle iteration history |
-| `u` | Toggle subagent tracing |
+| `T` | Toggle subagent tree panel (Shift+T) |
+| `t` | Cycle subagent detail level |
+| `o` | Cycle right panel views |
 | `q` | Quit |
 | `?` | Show help |
 
