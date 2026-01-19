@@ -154,6 +154,15 @@ ralph-tui create-prd --output ./docs
 | `e` | Edit current remote (when viewing remote tab) |
 | `x` | Delete current remote (when viewing remote tab) |
 
+**Dashboard (`d` key):** Toggle a status panel showing:
+- Current execution status and active task
+- Agent name and model (e.g., `claude-code`, `anthropic/claude-sonnet`)
+- Tracker source (e.g., `prd`, `beads`)
+- Git branch with dirty indicator (repo:branch*)
+- Sandbox status (🔒 enabled, 🔓 disabled) with mode
+- Auto-commit setting (✓ auto, ✗ manual)
+- Remote connection info (when viewing remote tabs)
+
 See the [full CLI reference](https://ralph-tui.com/docs/cli/overview) for all options.
 
 ### Using Skills Directly in Your Agent
@@ -347,6 +356,25 @@ When connected to remote instances, a tab bar appears at the top of the TUI:
 | `Ctrl+Shift+Tab` | Previous tab |
 
 The first tab is always "Local" (your current machine). Remote tabs show the alias you configured with connection status.
+
+### Managing Remotes from the TUI
+
+You can add, edit, and delete remote servers directly from the TUI without leaving the interface:
+
+**Add Remote (`a` key):**
+Opens a form dialog to configure a new remote:
+- **Alias**: A short name for the remote (e.g., "prod", "dev-server")
+- **Host**: The server address (e.g., "192.168.1.100", "server.example.com")
+- **Port**: The listener port (default: 7890)
+- **Token**: The server token (displayed on the remote when you start with `--listen`)
+
+Use `Tab`/`Shift+Tab` to move between fields, `Enter` to save, `Esc` to cancel.
+
+**Edit Remote (`e` key):**
+When viewing a remote tab, press `e` to edit its configuration. The form pre-fills with current values. You can change any field including the alias.
+
+**Delete Remote (`x` key):**
+When viewing a remote tab, press `x` to delete it. A confirmation dialog shows the remote details before deletion.
 
 ### Full Remote Control
 

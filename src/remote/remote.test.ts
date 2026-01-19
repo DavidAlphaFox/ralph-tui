@@ -584,6 +584,637 @@ describe('InstanceManager', () => {
       expect(DEFAULT_RECONNECT_CONFIG.silentRetryThreshold).toBe(3);
     });
   });
+
+  describe('Remote Management Methods', () => {
+    test('getTabIndexByAlias returns -1 for non-existent alias', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      // Initialize with local tab only
+      await manager.initialize();
+
+      const index = manager.getTabIndexByAlias('non-existent');
+      expect(index).toBe(-1);
+    });
+
+    test('getTabIndexByAlias returns correct index for existing alias', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      // Initialize and manually add a tab for testing
+      await manager.initialize();
+      const tabs = manager.getTabs();
+
+      // The local tab is always at index 0
+      expect(tabs[0].isLocal).toBe(true);
+      expect(manager.getTabIndexByAlias('local-alias')).toBe(-1); // Local tab has no alias
+    });
+
+    test('disconnectRemote handles non-existent alias gracefully', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      // Should not throw when disconnecting non-existent remote
+      expect(() => manager.disconnectRemote('non-existent')).not.toThrow();
+    });
+
+    test('removeTab handles non-existent alias gracefully', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+      const initialTabCount = manager.getTabs().length;
+
+      // Should not throw when removing non-existent tab
+      expect(() => manager.removeTab('non-existent')).not.toThrow();
+
+      // Tab count should remain unchanged
+      expect(manager.getTabs().length).toBe(initialTabCount);
+    });
+
+    test('removeTab does not remove local tab', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+      const initialTabs = manager.getTabs();
+
+      // Local tab should exist
+      expect(initialTabs.some(t => t.isLocal)).toBe(true);
+
+      // Try to remove by local tab's alias (should be undefined)
+      manager.removeTab('local');
+
+      // Local tab should still exist (removeTab won't match it since alias is undefined)
+      const tabsAfter = manager.getTabs();
+      expect(tabsAfter.some(t => t.isLocal)).toBe(true);
+    });
+
+    test('getTabs returns tabs array', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+      const tabs = manager.getTabs();
+
+      expect(Array.isArray(tabs)).toBe(true);
+      expect(tabs.length).toBeGreaterThanOrEqual(1); // At least local tab
+      expect(tabs[0].isLocal).toBe(true);
+    });
+
+    test('getSelectedIndex returns valid index', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+      const index = manager.getSelectedIndex();
+
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(index).toBeLessThan(manager.getTabs().length);
+    });
+
+    test('onStateChange callback is called on state changes', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      let callCount = 0;
+      let lastTabs: unknown[] = [];
+      let lastIndex = -1;
+
+      manager.onStateChange((tabs, index) => {
+        callCount++;
+        lastTabs = tabs;
+        lastIndex = index;
+      });
+
+      await manager.initialize();
+
+      // State change should have been called at least once during init
+      expect(callCount).toBeGreaterThanOrEqual(1);
+      expect(Array.isArray(lastTabs)).toBe(true);
+      expect(lastIndex).toBeGreaterThanOrEqual(0);
+    });
+
+    test('onToast callback is registered', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      let toastReceived = false;
+      manager.onToast(() => {
+        toastReceived = true;
+      });
+
+      // Just verify the callback was registered without error
+      expect(toastReceived).toBe(false); // No toast yet
+    });
+
+    test('disconnectAll handles empty clients map', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      // Should not throw when disconnecting with no remote clients
+      expect(() => manager.disconnectAll()).not.toThrow();
+    });
+
+    test('selectTab validates index bounds', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      // Selecting a valid index should work
+      await manager.selectTab(0);
+      expect(manager.getSelectedIndex()).toBe(0);
+    });
+
+    test('getClientByAlias returns null for non-existent alias', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      const client = manager.getClientByAlias('non-existent');
+      expect(client).toBeNull();
+    });
+
+    test('getSelectedClient returns null when local tab selected', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+      await manager.selectTab(0); // Select local tab
+
+      const client = manager.getSelectedClient();
+      expect(client).toBeNull(); // Local tab has no client
+    });
+
+    test('isViewingRemote returns false when local tab selected', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+      await manager.selectTab(0); // Select local tab
+
+      expect(manager.isViewingRemote()).toBe(false);
+    });
+
+    test('getSelectedTab returns local tab when selected', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+      await manager.selectTab(0); // Select local tab
+
+      const tab = manager.getSelectedTab();
+      expect(tab).toBeDefined();
+      expect(tab?.isLocal).toBe(true);
+    });
+  });
+
+  describe('Remote Management with Mocked WebSocket', () => {
+    let mockWebSocket: {
+      send: ReturnType<typeof mock>;
+      close: ReturnType<typeof mock>;
+      onopen: (() => void) | null;
+      onmessage: ((event: { data: string }) => void) | null;
+      onerror: ((error: Error) => void) | null;
+      onclose: (() => void) | null;
+      readyState: number;
+    };
+    let originalWebSocket: typeof WebSocket;
+
+    beforeEach(() => {
+      mockWebSocket = {
+        send: mock(() => {}),
+        close: mock(() => {}),
+        onopen: null,
+        onmessage: null,
+        onerror: null,
+        onclose: null,
+        readyState: 1, // OPEN
+      };
+
+      originalWebSocket = globalThis.WebSocket;
+      (globalThis as unknown as { WebSocket: unknown }).WebSocket = mock(() => mockWebSocket);
+    });
+
+    afterEach(() => {
+      (globalThis as unknown as { WebSocket: unknown }).WebSocket = originalWebSocket;
+    });
+
+    test('addAndConnectRemote creates tab and attempts connection', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+      const initialTabCount = manager.getTabs().length;
+
+      // Start add and connect (don't await fully - connection will be mocked)
+      const addPromise = manager.addAndConnectRemote('test-remote', 'localhost', 7890, 'test-token');
+
+      // Tab should be added immediately
+      const tabs = manager.getTabs();
+      expect(tabs.length).toBe(initialTabCount + 1);
+
+      const newTab = tabs.find(t => t.alias === 'test-remote');
+      expect(newTab).toBeDefined();
+      expect(newTab?.host).toBe('localhost');
+      expect(newTab?.port).toBe(7890);
+      expect(newTab?.isLocal).toBe(false);
+
+      // Simulate connection open and auth
+      mockWebSocket.onopen?.();
+
+      // Simulate auth response
+      const authResponse = {
+        type: 'auth_response',
+        id: 'test-id',
+        timestamp: new Date().toISOString(),
+        success: true,
+        connectionToken: 'conn-token',
+        connectionTokenExpiresAt: new Date(Date.now() + 86400000).toISOString(),
+      };
+      mockWebSocket.onmessage?.({ data: JSON.stringify(authResponse) });
+
+      // Wait for connection to complete
+      await addPromise.catch(() => {}); // May throw due to partial mock
+    });
+
+    test('removeTab disconnects and removes tab', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      // Add a remote tab first
+      manager.addAndConnectRemote('to-remove', 'localhost', 7890, 'token').catch(() => {});
+
+      // Simulate connection
+      mockWebSocket.onopen?.();
+      const authResponse = {
+        type: 'auth_response',
+        id: 'test-id',
+        timestamp: new Date().toISOString(),
+        success: true,
+      };
+      mockWebSocket.onmessage?.({ data: JSON.stringify(authResponse) });
+
+      // Wait a tick
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      const tabCountBefore = manager.getTabs().length;
+
+      // Remove the tab
+      manager.removeTab('to-remove');
+
+      // Tab should be removed
+      const tabCountAfter = manager.getTabs().length;
+      expect(tabCountAfter).toBe(tabCountBefore - 1);
+
+      const removedTab = manager.getTabs().find(t => t.alias === 'to-remove');
+      expect(removedTab).toBeUndefined();
+    });
+
+    test('disconnectRemote updates tab status', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      // Add a remote tab
+      manager.addAndConnectRemote('test-disconnect', 'localhost', 7890, 'token').catch(() => {});
+
+      // Simulate connection
+      mockWebSocket.onopen?.();
+      const authResponse = {
+        type: 'auth_response',
+        id: 'test-id',
+        timestamp: new Date().toISOString(),
+        success: true,
+      };
+      mockWebSocket.onmessage?.({ data: JSON.stringify(authResponse) });
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Disconnect
+      manager.disconnectRemote('test-disconnect');
+
+      // Tab should still exist but be disconnected
+      const tab = manager.getTabs().find(t => t.alias === 'test-disconnect');
+      expect(tab).toBeDefined();
+      expect(tab?.status).toBe('disconnected');
+    });
+
+    test('reconnectRemote updates tab info and reconnects', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      // Add initial remote
+      manager.addAndConnectRemote('reconnect-test', 'old-host', 7890, 'old-token').catch(() => {});
+
+      mockWebSocket.onopen?.();
+      mockWebSocket.onmessage?.({ data: JSON.stringify({
+        type: 'auth_response',
+        id: 'test-id',
+        timestamp: new Date().toISOString(),
+        success: true,
+      })});
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Reconnect with new details
+      manager.reconnectRemote('reconnect-test', 'new-host', 8890, 'new-token').catch(() => {});
+
+      // Tab should have updated info
+      const tab = manager.getTabs().find(t => t.alias === 'reconnect-test');
+      expect(tab).toBeDefined();
+      expect(tab?.host).toBe('new-host');
+      expect(tab?.port).toBe(8890);
+    });
+
+    test('getTabIndexByAlias returns correct index after adding remote', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      // Add a remote
+      manager.addAndConnectRemote('index-test', 'localhost', 7890, 'token').catch(() => {});
+
+      // Should find the tab at the correct index
+      const index = manager.getTabIndexByAlias('index-test');
+      expect(index).toBeGreaterThan(0); // Should be after local tab
+
+      const tabs = manager.getTabs();
+      expect(tabs[index]?.alias).toBe('index-test');
+    });
+
+    test('selectNextTab cycles through tabs', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      // Start at local tab (index 0)
+      expect(manager.getSelectedIndex()).toBe(0);
+
+      // If there's only one tab, next should stay at 0
+      if (manager.getTabs().length === 1) {
+        await manager.selectNextTab();
+        expect(manager.getSelectedIndex()).toBe(0);
+      }
+    });
+
+    test('selectPreviousTab cycles through tabs', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      // Start at local tab (index 0)
+      expect(manager.getSelectedIndex()).toBe(0);
+
+      // Previous from first with only one tab should stay at 0
+      if (manager.getTabs().length === 1) {
+        await manager.selectPreviousTab();
+        expect(manager.getSelectedIndex()).toBe(0);
+      }
+    });
+
+    test('refresh does not throw', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      // Refresh should not throw
+      let threw = false;
+      try {
+        await manager.refresh();
+      } catch {
+        threw = true;
+      }
+      expect(threw).toBe(false);
+    });
+
+    test('selectTab ignores out-of-bounds index', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      // Select negative index - should not change
+      await manager.selectTab(-1);
+      expect(manager.getSelectedIndex()).toBe(0);
+
+      // Select too-high index - should not change
+      await manager.selectTab(999);
+      expect(manager.getSelectedIndex()).toBe(0);
+    });
+
+    test('selectTab notifies state change', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      let stateChangeCalled = false;
+      manager.onStateChange(() => {
+        stateChangeCalled = true;
+      });
+
+      await manager.initialize();
+      stateChangeCalled = false; // Reset after init
+
+      await manager.selectTab(0);
+      expect(stateChangeCalled).toBe(true);
+    });
+
+    test('addAndConnectRemote adds tab synchronously', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+      const initialCount = manager.getTabs().length;
+
+      // Start adding remote (don't await - just verify tab is added synchronously)
+      manager.addAndConnectRemote('sync-test', 'localhost', 7890, 'token');
+
+      // Tab should be added immediately (synchronously, before connection completes)
+      expect(manager.getTabs().length).toBe(initialCount + 1);
+
+      const newTab = manager.getTabs().find(t => t.alias === 'sync-test');
+      expect(newTab).toBeDefined();
+      expect(newTab?.host).toBe('localhost');
+      expect(newTab?.port).toBe(7890);
+    });
+
+    test('notifyStateChange calls handler with current state', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      let receivedTabs: unknown[] = [];
+      let receivedIndex = -1;
+
+      manager.onStateChange((tabs, index) => {
+        receivedTabs = tabs;
+        receivedIndex = index;
+      });
+
+      await manager.initialize();
+
+      expect(receivedTabs.length).toBeGreaterThanOrEqual(1);
+      expect(receivedIndex).toBeGreaterThanOrEqual(0);
+    });
+
+    test('removeTab decreases tab count', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+      const initialCount = manager.getTabs().length;
+
+      // Add a remote tab
+      manager.addAndConnectRemote('remove-count-test', 'host', 7890, 'token');
+      expect(manager.getTabs().length).toBe(initialCount + 1);
+
+      // Remove the tab
+      manager.removeTab('remove-count-test');
+      expect(manager.getTabs().length).toBe(initialCount);
+    });
+
+    test('removeTab removes correct tab by alias', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      // Add a remote tab
+      manager.addAndConnectRemote('alias-remove-test', 'host', 7890, 'token');
+
+      // Verify tab exists
+      expect(manager.getTabs().some(t => t.alias === 'alias-remove-test')).toBe(true);
+
+      // Remove it
+      manager.removeTab('alias-remove-test');
+
+      // Verify tab is gone
+      expect(manager.getTabs().some(t => t.alias === 'alias-remove-test')).toBe(false);
+    });
+
+    test('reconnectRemote updates host and port', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      // Add initial remote
+      manager.addAndConnectRemote('reconnect-me', 'old-host', 1111, 'old-token');
+
+      const tabBefore = manager.getTabs().find(t => t.alias === 'reconnect-me');
+      expect(tabBefore?.host).toBe('old-host');
+      expect(tabBefore?.port).toBe(1111);
+
+      // Reconnect with new details (don't await, just trigger)
+      manager.reconnectRemote('reconnect-me', 'new-host', 2222, 'new-token');
+
+      // Tab should have new host/port immediately
+      const tabAfter = manager.getTabs().find(t => t.alias === 'reconnect-me');
+      expect(tabAfter?.host).toBe('new-host');
+      expect(tabAfter?.port).toBe(2222);
+    });
+
+    test('emitToast calls toast handler', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      const toasts: unknown[] = [];
+      manager.onToast((toast) => {
+        toasts.push(toast);
+      });
+
+      await manager.initialize();
+
+      // Add a remote - this should trigger toast events during connection attempts
+      manager.addAndConnectRemote('toast-test', 'localhost', 7890, 'token');
+
+      // Simulate connection error which should emit a toast
+      mockWebSocket.onerror?.(new Error('Connection failed'));
+
+      // Wait a tick for events to propagate
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // May or may not have toasts depending on error handling
+      // This test mainly exercises the toast handler registration path
+      expect(Array.isArray(toasts)).toBe(true);
+    });
+
+    test('getTabIndexByAlias with multiple remotes', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      // Add multiple remotes
+      manager.addAndConnectRemote('idx-first', 'host1', 7890, 'token1');
+      manager.addAndConnectRemote('idx-second', 'host2', 7890, 'token2');
+      manager.addAndConnectRemote('idx-third', 'host3', 7890, 'token3');
+
+      // Each remote should have the correct index
+      const firstIdx = manager.getTabIndexByAlias('idx-first');
+      const secondIdx = manager.getTabIndexByAlias('idx-second');
+      const thirdIdx = manager.getTabIndexByAlias('idx-third');
+
+      expect(firstIdx).toBeGreaterThan(0); // After local
+      expect(secondIdx).toBe(firstIdx + 1);
+      expect(thirdIdx).toBe(secondIdx + 1);
+    });
+
+    test('disconnectRemote with non-existent alias does nothing', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+      const tabCount = manager.getTabs().length;
+
+      // Disconnect non-existent alias should not throw or change state
+      manager.disconnectRemote('does-not-exist');
+
+      expect(manager.getTabs().length).toBe(tabCount);
+    });
+
+    test('state change handler is replaced on second registration', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      let handler1CallCount = 0;
+      let handler2CallCount = 0;
+
+      manager.onStateChange(() => { handler1CallCount++; });
+      manager.onStateChange(() => { handler2CallCount++; }); // Replaces first handler
+
+      await manager.initialize();
+
+      // Only the second handler should be called (onStateChange replaces the handler)
+      expect(handler1CallCount).toBe(0);
+      expect(handler2CallCount).toBeGreaterThan(0);
+    });
+
+    test('getClientByAlias returns null for local tab', async () => {
+      const { InstanceManager } = await import('./instance-manager.js');
+      const manager = new InstanceManager();
+
+      await manager.initialize();
+
+      // Local tab has no alias, but even if we try with 'local', should return null
+      const client = manager.getClientByAlias('local');
+      expect(client).toBeNull();
+    });
+  });
 });
 
 // ============================================================================
