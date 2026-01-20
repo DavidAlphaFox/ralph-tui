@@ -99,9 +99,11 @@ export class CodexAgentPlugin extends BaseAgentPlugin {
     command: string
   ): Promise<{ success: boolean; version?: string; error?: string }> {
     return new Promise((resolve) => {
+      // Only use shell on Windows where direct spawn may not work
+      const useShell = process.platform === 'win32';
       const proc = spawn(command, ['--version'], {
         stdio: ['ignore', 'pipe', 'pipe'],
-        shell: true,
+        shell: useShell,
       });
 
       let stdout = '';
@@ -122,7 +124,14 @@ export class CodexAgentPlugin extends BaseAgentPlugin {
       proc.on('close', (code) => {
         if (code === 0) {
           const versionMatch = stdout.match(/(\d+\.\d+\.\d+)/);
-          resolve({ success: true, version: versionMatch?.[1] });
+          if (!versionMatch?.[1]) {
+            resolve({
+              success: false,
+              error: `Unable to parse codex version output: ${stdout}`,
+            });
+            return;
+          }
+          resolve({ success: true, version: versionMatch[1] });
         } else {
           resolve({ success: false, error: stderr || `Exited with code ${code}` });
         }
