@@ -435,9 +435,9 @@ export abstract class BaseAgentPlugin implements AgentPlugin {
       })
       .catch((error: Error) => {
         const endedAt = new Date();
-        resolvePromise!({
+        const result = {
           executionId,
-          status: 'failed',
+          status: 'failed' as const,
           exitCode: undefined,
           stdout: '',
           stderr: error.message,
@@ -446,7 +446,21 @@ export abstract class BaseAgentPlugin implements AgentPlugin {
           interrupted: false,
           startedAt: startedAt.toISOString(),
           endedAt: endedAt.toISOString(),
-        });
+        };
+
+        // Call onEnd lifecycle hook before resolving (same pattern as completeExecution)
+        if (options?.onEnd) {
+          try {
+            options.onEnd(result);
+          } catch (err) {
+            if (process.env.RALPH_DEBUG) {
+              debugLog(`[DEBUG] onEnd hook threw error: ${err instanceof Error ? err.message : String(err)}`);
+            }
+            // Swallow error - always proceed to resolve
+          }
+        }
+
+        resolvePromise!(result);
       });
 
     // Return the handle

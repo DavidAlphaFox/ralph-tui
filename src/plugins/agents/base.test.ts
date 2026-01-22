@@ -304,7 +304,7 @@ describe('BaseAgentPlugin', () => {
 
 /**
  * Test plugin that uses the real execute method for testing lifecycle hooks.
- * Uses 'echo' or 'true' commands which exist on all platforms.
+ * Uses 'cmd /c echo' on Windows and 'echo' on other platforms.
  */
 class RealExecuteTestPlugin extends BaseAgentPlugin {
   readonly meta: AgentPluginMeta = {
