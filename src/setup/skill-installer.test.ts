@@ -25,12 +25,12 @@ const {
   getBundledSkillsDir,
   listBundledSkills,
   isSkillInstalledAt,
-  installSkillTo,
   computeSkillsPath,
   expandTilde,
   resolveSkillsPath,
-  installSkillsForAgent,
-  getSkillStatusForAgent,
+  AGENT_ID_MAP,
+  resolveAddSkillAgentId,
+  buildAddSkillInstallArgs,
 } = skillInstaller;
 
 describe('computeSkillsPath', () => {
@@ -254,238 +254,81 @@ describe('isSkillInstalledAt', () => {
     const result = await isSkillInstalledAt('non-existent-skill', tempDir);
     expect(result).toBe(false);
   });
+});
 
-  test('returns true for skill that exists in directory', async () => {
-    const skills = await listBundledSkills();
-    if (skills.length === 0) {
-      console.log('Skipping: No bundled skills found');
-      return;
-    }
-    // Install a skill to temp dir first
-    await installSkillTo('ralph-tui-prd', tempDir, { force: true });
-    const result = await isSkillInstalledAt('ralph-tui-prd', tempDir);
-    expect(result).toBe(true);
+describe('AGENT_ID_MAP', () => {
+  test('maps claude to claude-code', () => {
+    expect(AGENT_ID_MAP['claude']).toBe('claude-code');
+  });
+
+  test('maps opencode to opencode', () => {
+    expect(AGENT_ID_MAP['opencode']).toBe('opencode');
+  });
+
+  test('maps codex to codex', () => {
+    expect(AGENT_ID_MAP['codex']).toBe('codex');
+  });
+
+  test('maps gemini to gemini', () => {
+    expect(AGENT_ID_MAP['gemini']).toBe('gemini');
+  });
+
+  test('maps kiro to kiro', () => {
+    expect(AGENT_ID_MAP['kiro']).toBe('kiro');
   });
 });
 
-describe('installSkillTo', () => {
-  let tempDir: string;
-
-  beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'ralph-tui-skill-test-'));
+describe('resolveAddSkillAgentId', () => {
+  test('maps known ralph-tui IDs', () => {
+    expect(resolveAddSkillAgentId('claude')).toBe('claude-code');
+    expect(resolveAddSkillAgentId('opencode')).toBe('opencode');
   });
 
-  afterEach(async () => {
-    await rm(tempDir, { recursive: true, force: true });
-  });
-
-  test('installs skill to specified directory', async () => {
-    const skills = await listBundledSkills();
-    if (skills.length === 0) {
-      console.log('Skipping: No bundled skills found');
-      return;
-    }
-    const result = await installSkillTo('ralph-tui-prd', tempDir, { force: true });
-    expect(result.success).toBe(true);
-    expect(result.path).toBe(join(tempDir, 'ralph-tui-prd'));
-  });
-
-  test('returns error for non-existent skill', async () => {
-    const result = await installSkillTo('non-existent-skill', tempDir);
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('not found');
-  });
-
-  test('skips already installed skill without force', async () => {
-    const skills = await listBundledSkills();
-    if (skills.length === 0) {
-      console.log('Skipping: No bundled skills found');
-      return;
-    }
-    // First install
-    await installSkillTo('ralph-tui-prd', tempDir, { force: true });
-    // Second without force
-    const result = await installSkillTo('ralph-tui-prd', tempDir, { force: false });
-    expect(result.success).toBe(true);
-    expect(result.skipped).toBe(true);
-  });
-
-  test('overwrites with force option', async () => {
-    const skills = await listBundledSkills();
-    if (skills.length === 0) {
-      console.log('Skipping: No bundled skills found');
-      return;
-    }
-    // First install
-    await installSkillTo('ralph-tui-prd', tempDir, { force: true });
-    // Second with force
-    const result = await installSkillTo('ralph-tui-prd', tempDir, { force: true });
-    expect(result.success).toBe(true);
-    expect(result.skipped).toBeFalsy();
+  test('passes through unknown IDs unchanged', () => {
+    expect(resolveAddSkillAgentId('cursor')).toBe('cursor');
+    expect(resolveAddSkillAgentId('windsurf')).toBe('windsurf');
   });
 });
 
-describe('installSkillsForAgent', () => {
-  let tempDir: string;
-
-  beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'ralph-tui-skill-test-'));
-  });
-
-  afterEach(async () => {
-    await rm(tempDir, { recursive: true, force: true });
-  });
-
-  test('installs skills to personal directory by default', async () => {
-    const skills = await listBundledSkills();
-    if (skills.length === 0) {
-      console.log('Skipping: No bundled skills found');
-      return;
-    }
-    const skillsPaths = {
-      personal: tempDir,
-      repo: '.test-skills',
-    };
-    const result = await installSkillsForAgent('test-agent', 'Test Agent', skillsPaths, {
-      force: true,
+describe('buildAddSkillInstallArgs', () => {
+  test('builds args for global install of all skills', () => {
+    const args = buildAddSkillInstallArgs({
+      agentId: 'claude',
+      global: true,
     });
-    expect(result.agentId).toBe('test-agent');
-    expect(result.agentName).toBe('Test Agent');
-    expect(result.skills.size).toBe(skills.length);
-    expect(result.hasInstalls).toBe(true);
-    expect(result.allSkipped).toBe(false);
+    expect(args).toEqual(['add-skill', 'subsy/ralph-tui', '-a', 'claude-code', '-g', '-y']);
   });
 
-  test('installs specific skill when skillName provided', async () => {
-    const skills = await listBundledSkills();
-    if (skills.length === 0) {
-      console.log('Skipping: No bundled skills found');
-      return;
-    }
-    const skillsPaths = {
-      personal: tempDir,
-      repo: '.test-skills',
-    };
-    const result = await installSkillsForAgent('test-agent', 'Test Agent', skillsPaths, {
-      force: true,
+  test('builds args for specific skill', () => {
+    const args = buildAddSkillInstallArgs({
+      agentId: 'opencode',
       skillName: 'ralph-tui-prd',
+      global: true,
     });
-    expect(result.skills.size).toBe(1);
-    expect(result.skills.has('ralph-tui-prd')).toBe(true);
+    expect(args).toEqual(['add-skill', 'subsy/ralph-tui', '-s', 'ralph-tui-prd', '-a', 'opencode', '-g', '-y']);
   });
 
-  test('installs to repo directory when repo option is true', async () => {
-    const skills = await listBundledSkills();
-    if (skills.length === 0) {
-      console.log('Skipping: No bundled skills found');
-      return;
-    }
-    const repoSkillsDir = join(tempDir, '.test-skills');
-    const skillsPaths = {
-      personal: join(tempDir, 'personal'),
-      repo: '.test-skills',
-    };
-    const result = await installSkillsForAgent('test-agent', 'Test Agent', skillsPaths, {
-      force: true,
-      personal: false,
-      repo: true,
-      cwd: tempDir,
+  test('omits -g flag when global is false', () => {
+    const args = buildAddSkillInstallArgs({
+      agentId: 'claude',
+      global: false,
     });
-    expect(result.hasInstalls).toBe(true);
-    // Check that skill was installed to repo dir
-    const installed = await isSkillInstalledAt('ralph-tui-prd', repoSkillsDir);
-    expect(installed).toBe(true);
+    expect(args).toEqual(['add-skill', 'subsy/ralph-tui', '-a', 'claude-code', '-y']);
   });
 
-  test('returns allSkipped true when skills already installed', async () => {
-    const skills = await listBundledSkills();
-    if (skills.length === 0) {
-      console.log('Skipping: No bundled skills found');
-      return;
-    }
-    const skillsPaths = {
-      personal: tempDir,
-      repo: '.test-skills',
-    };
-    // First install
-    await installSkillsForAgent('test-agent', 'Test Agent', skillsPaths, { force: true });
-    // Second install without force
-    const result = await installSkillsForAgent('test-agent', 'Test Agent', skillsPaths, {
-      force: false,
+  test('defaults to global when not specified', () => {
+    const args = buildAddSkillInstallArgs({
+      agentId: 'claude',
     });
-    expect(result.allSkipped).toBe(true);
-    expect(result.hasInstalls).toBe(false);
+    expect(args).toContain('-g');
   });
 
-  test('handles failed installations in allSkipped calculation', async () => {
-    const skillsPaths = {
-      personal: tempDir,
-      repo: '.test-skills',
-    };
-    // Use a non-existent skill name
-    const result = await installSkillsForAgent('test-agent', 'Test Agent', skillsPaths, {
-      skillName: 'non-existent-skill-xyz',
+  test('passes through unknown agent IDs', () => {
+    const args = buildAddSkillInstallArgs({
+      agentId: 'cursor',
+      global: true,
     });
-    // No skills found to install
-    expect(result.skills.size).toBe(0);
-    expect(result.allSkipped).toBe(true);
-  });
-});
-
-describe('getSkillStatusForAgent', () => {
-  let tempDir: string;
-
-  beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'ralph-tui-skill-test-'));
-  });
-
-  afterEach(async () => {
-    await rm(tempDir, { recursive: true, force: true });
-  });
-
-  test('returns status map for all bundled skills', async () => {
-    const skills = await listBundledSkills();
-    const skillsPaths = {
-      personal: tempDir,
-      repo: join(tempDir, 'repo'),
-    };
-    const status = await getSkillStatusForAgent(skillsPaths);
-    expect(status.size).toBe(skills.length);
-  });
-
-  test('shows correct installation status', async () => {
-    const skills = await listBundledSkills();
-    if (skills.length === 0) {
-      console.log('Skipping: No bundled skills found');
-      return;
-    }
-    // Use tilde paths for personal (gets expanded) and relative for repo (needs cwd)
-    const personalDir = join(tempDir, 'personal');
-    const repoSubdir = 'repo-skills';
-    const repoDir = join(tempDir, repoSubdir);
-    const skillsPaths = {
-      personal: personalDir, // Absolute path works directly
-      repo: repoSubdir, // Relative path - needs cwd
-    };
-
-    // Initially not installed - pass tempDir as cwd for repo path resolution
-    let status = await getSkillStatusForAgent(skillsPaths, tempDir);
-    const initialStatus = status.get('ralph-tui-prd');
-    expect(initialStatus?.personal).toBe(false);
-    expect(initialStatus?.repo).toBe(false);
-
-    // Install to personal only
-    await installSkillTo('ralph-tui-prd', personalDir, { force: true });
-    status = await getSkillStatusForAgent(skillsPaths, tempDir);
-    const afterPersonal = status.get('ralph-tui-prd');
-    expect(afterPersonal?.personal).toBe(true);
-    expect(afterPersonal?.repo).toBe(false);
-
-    // Install to repo too
-    await installSkillTo('ralph-tui-prd', repoDir, { force: true });
-    status = await getSkillStatusForAgent(skillsPaths, tempDir);
-    const afterBoth = status.get('ralph-tui-prd');
-    expect(afterBoth?.personal).toBe(true);
-    expect(afterBoth?.repo).toBe(true);
+    expect(args).toContain('-a');
+    expect(args).toContain('cursor');
   });
 });

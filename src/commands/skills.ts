@@ -9,22 +9,12 @@ import {
   listBundledSkills,
   resolveSkillsPath,
   getSkillStatusForAgent,
+  AGENT_ID_MAP,
+  resolveAddSkillAgentId,
 } from '../setup/skill-installer.js';
 import { getAgentRegistry } from '../plugins/agents/registry.js';
 import { registerBuiltinAgents } from '../plugins/agents/builtin/index.js';
 import type { AgentPluginMeta, AgentSkillsPaths } from '../plugins/agents/types.js';
-
-/**
- * Mapping from ralph-tui agent IDs to add-skill agent IDs.
- * Used when delegating install to bunx add-skill.
- */
-const AGENT_ID_MAP: Record<string, string> = {
-  claude: 'claude-code',
-  opencode: 'opencode',
-  codex: 'codex',
-  gemini: 'gemini',
-  kiro: 'kiro',
-};
 
 // ANSI color codes
 const RESET = '\x1b[0m';
@@ -265,14 +255,6 @@ export function parseInstallArgs(args: string[]): {
 }
 
 /**
- * Resolve the add-skill agent ID from a ralph-tui agent ID.
- * Returns null if the agent is not supported by add-skill.
- */
-function resolveAddSkillAgent(ralphTuiId: string): string | null {
-  return AGENT_ID_MAP[ralphTuiId] ?? null;
-}
-
-/**
  * Build the bunx add-skill command arguments from parsed install options.
  */
 export function buildAddSkillArgs(options: {
@@ -290,13 +272,7 @@ export function buildAddSkillArgs(options: {
 
   // Agent targeting
   if (options.agentId) {
-    const addSkillId = resolveAddSkillAgent(options.agentId);
-    if (addSkillId) {
-      args.push('-a', addSkillId);
-    } else {
-      // Pass through as-is; add-skill may support it directly
-      args.push('-a', options.agentId);
-    }
+    args.push('-a', resolveAddSkillAgentId(options.agentId));
   }
 
   // Global vs local
@@ -317,18 +293,9 @@ export function buildAddSkillArgs(options: {
 async function handleInstallSkills(args: string[]): Promise<void> {
   const options = parseInstallArgs(args);
 
-  // Validate agent ID if provided
-  if (options.agentId) {
-    const addSkillId = resolveAddSkillAgent(options.agentId);
-    if (!addSkillId) {
-      // Check if it's a known ralph-tui agent without add-skill support
-      const agents = await getSkillCapableAgents();
-      const knownAgent = agents.find((a) => a.meta.id === options.agentId);
-      if (knownAgent) {
-        console.log(`${YELLOW}Warning:${RESET} Agent '${options.agentId}' is not directly supported by add-skill.`);
-        console.log(`${DIM}Passing through to add-skill as '${options.agentId}'...${RESET}\n`);
-      }
-    }
+  // Warn if agent ID is not in our known map (will be passed through)
+  if (options.agentId && !AGENT_ID_MAP[options.agentId]) {
+    console.log(`${DIM}Note: Passing '${options.agentId}' directly to add-skill.${RESET}\n`);
   }
 
   const addSkillArgs = buildAddSkillArgs(options);
