@@ -409,7 +409,15 @@ Press a number key to select, or continue chatting.`,
       // Build labels instruction for beads format
       let labelsInstruction = '';
       if (format === 'beads' && trackerLabels && trackerLabels.length > 0) {
-        const allLabels = ['ralph', ...trackerLabels.filter((l) => l !== 'ralph')];
+        const seen = new Set<string>(['ralph']);
+        const allLabels = ['ralph'];
+        for (const l of trackerLabels) {
+          const key = l.toLowerCase();
+          if (!seen.has(key)) {
+            seen.add(key);
+            allLabels.push(l);
+          }
+        }
         const labelsStr = allLabels.join(',');
         labelsInstruction = `
 
@@ -468,7 +476,7 @@ Read the PRD and create the appropriate tasks.${labelsInstruction}`;
         }
       }
     },
-    [prdPath, prdContent, isLoading, onError]
+    [prdPath, prdContent, isLoading, onError, trackerLabels]
   );
 
   /**
