@@ -11,6 +11,7 @@ import {
   getRecentProgressSummary,
   clearProgress,
   extractCodebasePatterns,
+  getCodebasePatternsForPrompt,
   PROGRESS_FILE,
 } from './progress.js';
 
@@ -141,6 +142,33 @@ Completed fifth task.
     test('extractCodebasePatterns returns empty for missing file', async () => {
       const patterns = await extractCodebasePatterns(testDir);
       expect(patterns).toEqual([]);
+    });
+
+    test('getCodebasePatternsForPrompt returns empty for no patterns', async () => {
+      await clearProgress(testDir);
+
+      const formatted = await getCodebasePatternsForPrompt(testDir);
+      expect(formatted).toBe('');
+    });
+
+    test('getCodebasePatternsForPrompt returns formatted markdown', async () => {
+      const content = `# Ralph Progress Log
+
+## Codebase Patterns (Study These First)
+
+- Pattern one
+- Pattern two
+
+---
+`;
+      await mkdir(join(testDir, '.ralph-tui'), { recursive: true });
+      await writeFile(join(testDir, PROGRESS_FILE), content);
+
+      const formatted = await getCodebasePatternsForPrompt(testDir);
+
+      expect(formatted).toContain('## Codebase Patterns (Study These First)');
+      expect(formatted).toContain('- Pattern one');
+      expect(formatted).toContain('- Pattern two');
     });
   });
 });
