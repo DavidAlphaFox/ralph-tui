@@ -5,7 +5,15 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEST_WORKSPACE="${1:-$SCRIPT_DIR/test-workspace}"
+
+# Read workspace path from saved file, or use default
+if [ -f "$SCRIPT_DIR/.test-workspace-path" ]; then
+    SAVED_WORKSPACE="$(cat "$SCRIPT_DIR/.test-workspace-path")"
+else
+    SAVED_WORKSPACE="${XDG_CACHE_HOME:-$HOME/.cache}/ralph-tui/test-workspace"
+fi
+
+TEST_WORKSPACE="${1:-$SAVED_WORKSPACE}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -15,6 +23,16 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}=== Ralph-TUI Test Reset ===${NC}"
+echo ""
+
+# Check if workspace exists
+if [ ! -d "$TEST_WORKSPACE" ]; then
+    echo -e "${RED}Test workspace not found at: $TEST_WORKSPACE${NC}"
+    echo -e "Run ${BLUE}$SCRIPT_DIR/setup-test-workspace.sh${NC} first."
+    exit 1
+fi
+
+echo -e "Workspace: ${BLUE}$TEST_WORKSPACE${NC}"
 echo ""
 
 # 1. Reset the PRD file to initial state (all passes: false)
@@ -36,14 +54,10 @@ fi
 
 # 2. Clean up test workspace outputs
 echo -e "${YELLOW}[2/5] Cleaning test workspace outputs...${NC}"
-if [ -d "$TEST_WORKSPACE" ]; then
-    rm -f "$TEST_WORKSPACE"/output-*.txt
-    rm -f "$TEST_WORKSPACE"/merged-*.txt
-    rm -f "$TEST_WORKSPACE"/summary.txt
-    echo -e "${GREEN}  Removed generated output files${NC}"
-else
-    echo -e "${BLUE}  Test workspace doesn't exist yet (will be created on first run)${NC}"
-fi
+rm -f "$TEST_WORKSPACE"/output-*.txt
+rm -f "$TEST_WORKSPACE"/merged-*.txt
+rm -f "$TEST_WORKSPACE"/summary.txt
+echo -e "${GREEN}  Removed generated output files${NC}"
 
 # 3. Clean up .ralph-tui session state
 echo -e "${YELLOW}[3/5] Cleaning Ralph-TUI session state...${NC}"
@@ -53,16 +67,18 @@ if [ -d "$RALPH_DIR" ]; then
     rm -f "$RALPH_DIR/lock.json"
     rm -f "$RALPH_DIR/progress.md"
     rm -rf "$RALPH_DIR/iterations"
+    mkdir -p "$RALPH_DIR/iterations"
     echo -e "${GREEN}  Removed session.json, lock.json, progress.md, and iterations/${NC}"
 else
-    echo -e "${BLUE}  No .ralph-tui directory found (clean state)${NC}"
+    mkdir -p "$RALPH_DIR/iterations"
+    echo -e "${BLUE}  Created fresh .ralph-tui directory${NC}"
 fi
 
 # 4. Optional: Reset git state in test workspace
 echo -e "${YELLOW}[4/5] Checking git state...${NC}"
 if [ -d "$TEST_WORKSPACE/.git" ]; then
     echo -e "${BLUE}  Git repo found. To fully reset git state, run:${NC}"
-    echo -e "    cd $TEST_WORKSPACE && git checkout . && git clean -fd"
+    echo -e "    cd $TEST_WORKSPACE && git reset --hard test-start && git clean -fd"
     echo -e "${BLUE}  (Not done automatically to preserve any work you want to keep)${NC}"
 else
     echo -e "${BLUE}  No git repo in test workspace${NC}"
@@ -77,6 +93,6 @@ echo -e "To run the test:"
 echo -e "  ${BLUE}cd $TEST_WORKSPACE${NC}"
 echo -e "  ${BLUE}ralph-tui run --prd $SCRIPT_DIR/test-prd.json${NC}"
 echo ""
-echo -e "Or from ralph-tui directory:"
+echo -e "Or from ralph-tui source directory:"
 echo -e "  ${BLUE}cd $(dirname "$SCRIPT_DIR")${NC}"
 echo -e "  ${BLUE}bun run dev -- run --prd testing/test-prd.json${NC}"

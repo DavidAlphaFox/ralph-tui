@@ -5,24 +5,51 @@ This guide describes a **repeatable, idempotent** method for manually testing Ra
 ## Quick Start
 
 ```bash
-# One-time setup
+# One-time setup (creates workspace in ~/.cache/ralph-tui/test-workspace)
 cd testing
 ./setup-test-workspace.sh
 
 # Run the test
-cd test-workspace
-ralph-tui run --prd ../test-prd.json
+cd ~/.cache/ralph-tui/test-workspace
+ralph-tui run --prd /path/to/ralph-tui/testing/test-prd.json
 
 # If something goes wrong, stop and reset
-./reset-test.sh
+/path/to/ralph-tui/testing/reset-test.sh
 
 # Run again
-ralph-tui run --prd ../test-prd.json
+ralph-tui run --prd /path/to/ralph-tui/testing/test-prd.json
 ```
 
-## Test Architecture
+## Architecture
 
-### What Gets Tested
+### Why External Workspace?
+
+The test workspace is created **outside** the ralph-tui repository to avoid:
+- Nested git repository issues
+- Accidental commits of test state
+- Conflicts with ralph-tui's own git history
+
+**Default location**: `~/.cache/ralph-tui/test-workspace`
+
+You can override this by passing a path to setup:
+```bash
+./setup-test-workspace.sh /custom/path/to/workspace
+```
+
+### What Gets Shared with Contributors
+
+| File | Location | Shared? |
+|------|----------|---------|
+| `test-prd.json` | `testing/` | Yes (committed) |
+| `setup-test-workspace.sh` | `testing/` | Yes (committed) |
+| `reset-test.sh` | `testing/` | Yes (committed) |
+| `TESTING.md` | `testing/` | Yes (committed) |
+| `.test-workspace-path` | `testing/` | No (gitignored) |
+| Test workspace | `~/.cache/...` | No (external) |
+
+Contributors clone the repo and run `./setup-test-workspace.sh` to create their own isolated test environment.
+
+## Test PRD Design
 
 The test PRD (`test-prd.json`) creates a **dependency graph** that exercises:
 
@@ -46,17 +73,17 @@ TEST-003 (P2) ──────────────────────
 
 | State Type | Location | Reset Method |
 |------------|----------|--------------|
-| Task completion | `test-prd.json` | All `passes` → `false` |
-| Session state | `.ralph-tui/session.json` | Deleted |
-| Session lock | `.ralph-tui/lock.json` | Deleted |
-| Progress context | `.ralph-tui/progress.md` | Deleted |
-| Iteration logs | `.ralph-tui/iterations/` | Directory cleared |
+| Task completion | `testing/test-prd.json` | All `passes` → `false` |
+| Session state | `<workspace>/.ralph-tui/session.json` | Deleted |
+| Session lock | `<workspace>/.ralph-tui/lock.json` | Deleted |
+| Progress context | `<workspace>/.ralph-tui/progress.md` | Deleted |
+| Iteration logs | `<workspace>/.ralph-tui/iterations/` | Directory cleared |
 | Generated files | `output-*.txt`, `merged-*.txt`, `summary.txt` | Deleted |
-| Git state | `.git/` | Optional: `git reset --hard test-start` |
+| Git state | `<workspace>/.git/` | Optional: `git reset --hard test-start` |
 
 ## Detailed Workflow
 
-### 1. Initial Setup (One Time)
+### 1. Initial Setup (One Time per Machine)
 
 ```bash
 cd /path/to/ralph-tui/testing
@@ -64,17 +91,19 @@ cd /path/to/ralph-tui/testing
 ```
 
 This creates:
-- `test-workspace/` - A fresh git repo for testing
+- `~/.cache/ralph-tui/test-workspace/` - Isolated git repo for testing
 - Initial commit with README and .gitignore
 - Git tag `test-start` for easy hard reset
+- `.test-workspace-path` file (gitignored) to remember location
 
 ### 2. Running a Test
 
 ```bash
-cd test-workspace
+# Navigate to the test workspace
+cd ~/.cache/ralph-tui/test-workspace
 
 # Option A: Using installed ralph-tui
-ralph-tui run --prd ../test-prd.json
+ralph-tui run --prd /path/to/ralph-tui/testing/test-prd.json
 
 # Option B: Using development build
 cd /path/to/ralph-tui
@@ -117,17 +146,15 @@ To test error handling:
 
 **Soft Reset** (keeps git history):
 ```bash
-cd /path/to/ralph-tui/testing
-./reset-test.sh
+/path/to/ralph-tui/testing/reset-test.sh
 ```
 
 **Hard Reset** (full clean slate):
 ```bash
-cd test-workspace
+cd ~/.cache/ralph-tui/test-workspace
 git reset --hard test-start
 git clean -fd
-cd ..
-./reset-test.sh
+/path/to/ralph-tui/testing/reset-test.sh
 ```
 
 ## Files Reference
@@ -135,34 +162,21 @@ cd ..
 | File | Purpose |
 |------|---------|
 | `testing/test-prd.json` | Test PRD with 5 tasks and dependencies |
-| `testing/setup-test-workspace.sh` | Creates fresh test workspace |
+| `testing/setup-test-workspace.sh` | Creates fresh test workspace (external) |
 | `testing/reset-test.sh` | Resets all state for re-testing |
-| `testing/test-workspace/` | The actual test git repo (created by setup) |
 | `testing/TESTING.md` | This documentation |
-
-## What Repo Should I Test On?
-
-**Use the test workspace** (`testing/test-workspace/`) for systematic testing. This is:
-- **Isolated**: Won't affect any real projects
-- **Idempotent**: Can be fully reset
-- **Controlled**: Known initial state
-- **Git-enabled**: Can test commit behavior
-
-For testing with **real-world complexity**, you can also:
-1. Clone any open source project to a temp directory
-2. Create a `prd.json` with actual feature tasks
-3. Run ralph-tui against it
-4. Delete the temp directory when done
+| `testing/.test-workspace-path` | Saved workspace location (gitignored) |
+| `~/.cache/ralph-tui/test-workspace/` | The actual test git repo (created by setup) |
 
 ## Troubleshooting
 
 ### Test won't start
 ```bash
 # Check for stale lock
-cat test-workspace/.ralph-tui/lock.json
+cat ~/.cache/ralph-tui/test-workspace/.ralph-tui/lock.json
 
 # Remove if stale
-rm test-workspace/.ralph-tui/lock.json
+rm ~/.cache/ralph-tui/test-workspace/.ralph-tui/lock.json
 ```
 
 ### Task status won't reset
@@ -177,16 +191,25 @@ jq '.userStories |= map(.passes = false)' testing/test-prd.json > tmp.json && mv
 ### Agent keeps failing
 Check the iteration logs:
 ```bash
-ls -la test-workspace/.ralph-tui/iterations/
-cat test-workspace/.ralph-tui/iterations/*.log | tail -100
+ls -la ~/.cache/ralph-tui/test-workspace/.ralph-tui/iterations/
+cat ~/.cache/ralph-tui/test-workspace/.ralph-tui/iterations/*.log | tail -100
 ```
 
 ### Git state is corrupted
 ```bash
-cd test-workspace
+cd ~/.cache/ralph-tui/test-workspace
 git status
 git reset --hard test-start
 git clean -fd
+```
+
+### Workspace not found
+```bash
+# Re-run setup
+./testing/setup-test-workspace.sh
+
+# Or check saved path
+cat testing/.test-workspace-path
 ```
 
 ## CI/Automated Testing
@@ -194,18 +217,19 @@ git clean -fd
 For automated testing in CI, you can run:
 
 ```bash
-# Setup
+# Setup (uses default location)
 ./testing/setup-test-workspace.sh
 
 # Run headless with max iterations
-ralph-tui run --prd testing/test-prd.json --headless --iterations 10
+cd ~/.cache/ralph-tui/test-workspace
+ralph-tui run --prd /path/to/ralph-tui/testing/test-prd.json --headless --iterations 10
 
 # Verify completion
-jq '.userStories | all(.passes)' testing/test-prd.json
+jq '.userStories | all(.passes)' /path/to/ralph-tui/testing/test-prd.json
 # Should output: true
 
 # Verify output files exist
-test -f testing/test-workspace/summary.txt && echo "PASS" || echo "FAIL"
+test -f summary.txt && echo "PASS" || echo "FAIL"
 ```
 
 ## Contributing

@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # ABOUTME: Sets up a clean test workspace for Ralph-TUI manual testing.
-# Creates a git repo with initial state that can be reset and re-tested.
+# Creates a git repo OUTSIDE ralph-tui to avoid nested repo issues.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEST_WORKSPACE="${1:-$SCRIPT_DIR/test-workspace}"
+
+# Default location: ~/.cache/ralph-tui/test-workspace
+# This avoids nested git repo issues and survives reboots (unlike /tmp)
+DEFAULT_WORKSPACE="${XDG_CACHE_HOME:-$HOME/.cache}/ralph-tui/test-workspace"
+TEST_WORKSPACE="${1:-$DEFAULT_WORKSPACE}"
 
 # Colors
 RED='\033[0;31m'
@@ -31,25 +35,27 @@ if [ -d "$TEST_WORKSPACE" ]; then
     fi
 fi
 
-# Create workspace directory
-echo -e "${YELLOW}[1/4] Creating test workspace...${NC}"
+# Create workspace directory (including parent dirs)
+echo -e "${YELLOW}[1/5] Creating test workspace...${NC}"
 mkdir -p "$TEST_WORKSPACE"
 echo -e "${GREEN}  Created: $TEST_WORKSPACE${NC}"
 
 # Initialize git repo
-echo -e "${YELLOW}[2/4] Initializing git repository...${NC}"
+echo -e "${YELLOW}[2/5] Initializing git repository...${NC}"
 cd "$TEST_WORKSPACE"
 git init --initial-branch=main
 echo -e "${GREEN}  Git repo initialized${NC}"
 
 # Create initial files
-echo -e "${YELLOW}[3/4] Creating initial files...${NC}"
+echo -e "${YELLOW}[3/5] Creating initial files...${NC}"
 
 # Create a simple README
-cat > README.md << 'EOF'
+cat > README.md << EOF
 # Ralph-TUI Test Workspace
 
 This is a test workspace for manually testing Ralph-TUI end-to-end workflow.
+
+**Source**: Created by \`$SCRIPT_DIR/setup-test-workspace.sh\`
 
 ## Purpose
 
@@ -61,18 +67,32 @@ This workspace is used to test:
 
 ## Files Created by Tests
 
-- `output-a.txt` - Created by TEST-001
-- `output-b.txt` - Created by TEST-002
-- `output-c.txt` - Created by TEST-003
-- `merged-ab.txt` - Created by TEST-004 (combines A and B)
-- `summary.txt` - Created by TEST-005 (final summary)
+- \`output-a.txt\` - Created by TEST-001
+- \`output-b.txt\` - Created by TEST-002
+- \`output-c.txt\` - Created by TEST-003
+- \`merged-ab.txt\` - Created by TEST-004 (combines A and B)
+- \`summary.txt\` - Created by TEST-005 (final summary)
+
+## Running Tests
+
+\`\`\`bash
+# Run ralph-tui with the test PRD
+ralph-tui run --prd $SCRIPT_DIR/test-prd.json
+
+# Or from ralph-tui source directory
+cd $(dirname "$SCRIPT_DIR")
+bun run dev -- run --prd testing/test-prd.json
+\`\`\`
 
 ## Reset
 
-To reset this workspace:
-```bash
-../reset-test.sh
-```
+\`\`\`bash
+# Soft reset (keeps git history)
+$SCRIPT_DIR/reset-test.sh
+
+# Hard reset (full clean slate)
+git reset --hard test-start && git clean -fd
+\`\`\`
 EOF
 
 # Create a .gitignore
@@ -96,9 +116,14 @@ git commit -m "Initial test workspace setup"
 echo -e "${GREEN}  Created README.md, .gitignore${NC}"
 
 # Create a git tag for easy reset
-echo -e "${YELLOW}[4/4] Creating reset point...${NC}"
+echo -e "${YELLOW}[4/5] Creating reset point...${NC}"
 git tag -a "test-start" -m "Initial state for testing"
 echo -e "${GREEN}  Created git tag 'test-start' for easy reset${NC}"
+
+# Save workspace location for reset script
+echo -e "${YELLOW}[5/5] Saving workspace location...${NC}"
+echo "$TEST_WORKSPACE" > "$SCRIPT_DIR/.test-workspace-path"
+echo -e "${GREEN}  Saved to $SCRIPT_DIR/.test-workspace-path${NC}"
 
 # Final summary
 echo ""
